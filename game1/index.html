@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -655,4 +654,1041 @@ function createRoom(floorNum, x, y, w, h, isEntrance = false) {
         wobble: 0,
         wobbleVel: 0,
         resident: null, // Populated during move-in events!
- 
+        lightsOn: false
+    };
+}
+
+function spawnNextActiveRoom() {
+    const topRoom = state.rooms[state.rooms.length - 1];
+    const nextFloor = topRoom.floor + 1;
+    const w = state.baseRoomWidth;
+    const h = state.roomHeight;
+
+    // Position high above the top room
+    const spawnY = topRoom.y - h - 135;
+    const startLeft = Math.random() < 0.5;
+    const margin = Math.max(20, width * 0.08);
+    const minX = margin;
+    const maxX = width - w - margin;
+
+    const startX = startLeft ? minX : maxX;
+    // Speed scales gently with floor height
+    const baseSpeed = Math.min(180 + nextFloor * 9, 440);
+
+    const room = createRoom(nextFloor, startX, spawnY, w, h, false);
+    state.activeRoom = {
+        ...room,
+        state: 'SWINGING', // SWINGING or DROPPING
+        vx: startLeft ? baseSpeed : -baseSpeed,
+        vy: 0,
+        minX,
+        maxX,
+        swingTime: 0
+    };
+}
+
+// --- Reset & Start ---
+function startGame() {
+    sfx.init();
+    state.mode = 'PLAYING';
+    state.score = 0;
+    state.lives = 3;
+    state.combo = 0;
+    state.perfectCount = 0;
+    state.rooms = [];
+    state.fallingMisses = [];
+    state.particles = [];
+    state.floatingTexts = [];
+
+    // Responsive room width
+    state.baseRoomWidth = Math.min(Math.max(width * 0.42, 136), 195);
+    state.roomHeight = 66;
+    state.groundY = height - 65;
+
+    // Create 1F Entrance Lobby
+    const entranceW = state.baseRoomWidth + 16;
+    const entranceX = (width - entranceW) / 2;
+    const entranceH = state.roomHeight + 10;
+    const entranceY = state.groundY - entranceH;
+
+    state.rooms.push(createRoom(1, entranceX, entranceY, entranceW, state.roomHeight, true));
+
+    state.cameraY = 0;
+    state.targetCameraY = 0;
+
+    spawnNextActiveRoom();
+    updateHUD();
+
+    document.getElementById('start-overlay').classList.add('hidden');
+    document.getElementById('result-overlay').classList.add('hidden');
+    document.getElementById('panorama-banner').style.display = 'none';
+}
+
+// --- Input Handling ---
+function handleDropInput(e) {
+    if (e && e.target && e.target.closest('button')) return;
+    if (state.mode !== 'PLAYING') return;
+    if (!state.activeRoom || state.activeRoom.state !== 'SWINGING') return;
+
+    state.activeRoom.state = 'DROPPING';
+    state.activeRoom.vy = 420; // Initial downward speed
+    sfx.playDrop();
+}
+
+window.addEventListener('pointerdown', (e) => {
+    handleDropInput(e);
+});
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'ArrowDown') {
+        e.preventDefault();
+        if (state.mode === 'PLAYING') {
+            handleDropInput();
+        }
+    }
+});
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+
+const soundBtn = document.getElementById('sound-btn');
+soundBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    sfx.init();
+    const muted = sfx.toggleMute();
+    soundBtn.textContent = muted ? '🔇' : '🔊';
+});
+
+// --- UI Helpers ---
+function updateHUD() {
+    const currentFloor = state.rooms.length;
+    document.getElementById('floor-display').textContent = `${currentFloor}F`;
+    document.getElementById('score-display').textContent = state.score.toLocaleString();
+
+    const hearts = '❤️'.repeat(Math.max(0, state.lives)) + '🤍'.repeat(Math.max(0, 3 - state.lives));
+    document.getElementById('lives-display').textContent = hearts;
+
+    const comboBadge = document.getElementById('combo-badge');
+    if (state.combo >= 2) {
+        document.getElementById('combo-display').textContent = `${state.combo} COMBO!`;
+        comboBadge.classList.add('active');
+    } else {
+        comboBadge.classList.remove('active');
+    }
+}
+
+let bannerTimeout = null;
+function showEventBanner(text) {
+    const banner = document.getElementById('event-banner');
+    banner.textContent = text;
+    banner.classList.add('show');
+    clearTimeout(bannerTimeout);
+    bannerTimeout = setTimeout(() => {
+        banner.classList.remove('show');
+    }, 2600);
+}
+
+function addFloatingText(text, x, y, color = '#3a2e39', scale = 1) {
+    state.floatingTexts.push({
+        text,
+        x,
+        y,
+        vy: -55,
+        alpha: 1,
+        color,
+        scale,
+        life: 1.15
+    });
+}
+
+function spawnParticles(x, y, count, colors, isStar = false) {
+    for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+        const speed = 60 + Math.random() * 140;
+        state.particles.push({
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 40,
+            size: isStar ? 7 + Math.random() * 5 : 4 + Math.random() * 5,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            alpha: 1,
+            rotation: Math.random() * Math.PI * 2,
+            vRot: (Math.random() - 0.5) * 8,
+            isStar
+        });
+    }
+}
+
+// --- Resident Move-in Event ---
+function triggerResidentMoveIn(newFloor) {
+    // Pick up to 2 lower rooms without residents and move cute residents in!
+    const candidates = state.rooms.filter(r => !r.isEntrance && !r.resident);
+    if (candidates.length > 0) {
+        const count = Math.min(2, candidates.length);
+        for (let i = 0; i < count; i++) {
+            const idx = Math.floor(Math.random() * candidates.length);
+            const room = candidates.splice(idx, 1)[0];
+            room.resident = RESIDENT_TYPES[Math.floor(Math.random() * RESIDENT_TYPES.length)];
+            room.lightsOn = true;
+            spawnParticles(room.x + room.w / 2, room.y + room.h / 2, 12, ['#ffd166', '#ff7b89', '#7ae582'], true);
+        }
+    }
+
+    const bonus = newFloor * 30;
+    state.score += bonus;
+    sfx.playFanfare();
+    showEventBanner(`🏠 ${newFloor}階達成！住民が入居しました！(+${bonus}pt) ✨`);
+}
+
+// --- Landing & Scoring Logic ---
+function evaluateLanding(dropping, targetBelow) {
+    const dropCenter = dropping.x + dropping.w / 2;
+    const targetCenter = targetBelow.x + targetBelow.w / 2;
+    const diff = dropCenter - targetCenter;
+    const absDiff = Math.abs(diff);
+
+    // Check overlap: needs at least 35% of room width overlapping to stay balanced
+    const overlapLeft = Math.max(dropping.x, targetBelow.x);
+    const overlapRight = Math.min(dropping.x + dropping.w, targetBelow.x + targetBelow.w);
+    const overlapWidth = overlapRight - overlapLeft;
+
+    if (overlapWidth < dropping.w * 0.35) {
+        // MISS! Tumble off
+        sfx.playMiss();
+        state.combo = 0;
+        state.lives--;
+        updateHUD();
+
+        state.fallingMisses.push({
+            ...dropping,
+            vx: diff >= 0 ? 110 : -110,
+            vy: -120,
+            rot: 0,
+            vRot: diff >= 0 ? 3.2 : -3.2
+        });
+
+        addFloatingText('おっとっと！💦', dropCenter, dropping.y, '#ff4d6d', 1.15);
+        state.activeRoom = null;
+
+        if (state.lives <= 0) {
+            setTimeout(startPanoramaEnding, 750);
+        } else {
+            setTimeout(spawnNextActiveRoom, 550);
+        }
+        return;
+    }
+
+    // Valid Landing! Snap Y to top of targetBelow
+    dropping.y = targetBelow.y - dropping.h;
+
+    const isSpecial = dropping.theme.isVip || dropping.theme.isJacuzzi;
+    const multiplier = isSpecial ? 2 : 1;
+    const perfectThreshold = 9; // pixels tolerance for PERFECT
+
+    if (absDiff <= perfectThreshold) {
+        // PERFECT! Snap neatly to targetCenter for crisp alignment
+        dropping.x = targetCenter - dropping.w / 2;
+        state.combo++;
+        state.perfectCount++;
+
+        const comboBonus = (state.combo - 1) * 25;
+        const gained = (150 + comboBonus) * multiplier;
+        state.score += gained;
+
+        sfx.playPerfect(state.combo);
+        spawnParticles(dropCenter, dropping.y + dropping.h, 18, ['#ffd166', '#ff7b89', '#70d6ff', '#ffffff'], true);
+
+        const label = isSpecial
+            ? `VIP PERFECT!! +${gained}pt ✨`
+            : state.combo >= 2
+                ? `PERFECT!! x${state.combo} (+${gained}pt)`
+                : `PERFECT!! ✨ (+${gained}pt)`;
+        addFloatingText(label, dropCenter, dropping.y - 12, '#ff8800', 1.2);
+    } else {
+        // GOOD / OK with Deduction Rule!
+        state.combo = 0;
+        // Deduction scales from -10pt to -65pt based on pixel offset
+        const maxOffset = dropping.w * 0.65;
+        const ratio = Math.min(absDiff / maxOffset, 1);
+        const deduction = Math.max(10, Math.round((ratio * 65) / 5) * 5);
+        const basePoints = 100 * multiplier;
+        const netPoints = Math.max(20, basePoints - deduction);
+
+        state.score += netPoints;
+
+        // Slight wobble physics on landing
+        dropping.wobbleVel = (diff > 0 ? 1 : -1) * Math.min(absDiff * 0.0025, 0.12);
+
+        sfx.playLand(true);
+        spawnParticles(dropCenter, dropping.y + dropping.h, 8, ['#ffffff', '#ffe082'], false);
+
+        addFloatingText(`+${basePoints}pt`, dropCenter, dropping.y - 26, '#3a2e39', 0.95);
+        addFloatingText(`ズレ減点 -${deduction}pt`, dropCenter, dropping.y - 4, '#e63946', 1.05);
+    }
+
+    // Add to permanent building stack
+    const placedRoom = {
+        ...dropping,
+        wobble: 0,
+        wobbleVel: dropping.wobbleVel || 0
+    };
+    state.rooms.push(placedRoom);
+    state.activeRoom = null;
+
+    // Check every 5 floors for Resident Move-in Event!
+    if (placedRoom.floor % 5 === 0) {
+        triggerResidentMoveIn(placedRoom.floor);
+    } else if (isSpecial) {
+        sfx.playFanfare();
+        showEventBanner(dropping.theme.isVip ? '👑 VIPルーム建設！スコア2倍！' : '🛁 ジャグジー付き部屋！スコア2倍！');
+    }
+
+    // Update Camera so top of building stays comfortably in lower-middle area
+    const desiredTopScreenY = height * 0.56;
+    if (placedRoom.y + state.targetCameraY < desiredTopScreenY) {
+        state.targetCameraY = desiredTopScreenY - placedRoom.y;
+    }
+
+    updateHUD();
+    setTimeout(spawnNextActiveRoom, 240);
+}
+
+// --- Game Over & Panorama Camera Tour ---
+function startPanoramaEnding() {
+    state.mode = 'PANORAMA';
+    state.panoramaTimer = 0;
+    state.panoramaStartY = state.cameraY;
+
+    const topRoom = state.rooms[state.rooms.length - 1];
+    // Start camera focused near top roof, then smoothly pan down to 1F ground
+    const topTargetY = Math.max(0, height * 0.35 - topRoom.y);
+    state.cameraY = topTargetY;
+    state.panoramaStartY = topTargetY;
+
+    document.getElementById('panorama-banner').style.display = 'block';
+}
+
+function showFinalResultCard() {
+    state.mode = 'GAMEOVER';
+    document.getElementById('panorama-banner').style.display = 'none';
+
+    const floors = state.rooms.length;
+    document.getElementById('final-score').textContent = `${state.score.toLocaleString()} pt`;
+    document.getElementById('final-floor').textContent = `${floors}F 建て`;
+    document.getElementById('final-perfect').textContent = `${state.perfectCount} 回`;
+
+    let rankTitle = 'かわいいアパート完成！';
+    if (floors >= 25) rankTitle = '伝説の超高層タワー完成！👑';
+    else if (floors >= 15) rankTitle = '街のランドマーク完成！✨';
+    else if (floors >= 8) rankTitle = '人気のデザイナーズマンション！🏠';
+    document.getElementById('result-title').textContent = rankTitle;
+
+    document.getElementById('result-overlay').classList.remove('hidden');
+}
+
+// --- Update Loop ---
+let lastTime = performance.now();
+
+function update(dt) {
+    // Update clouds & birds
+    state.clouds.forEach(c => {
+        c.x += c.speed * dt;
+        if (c.x > width + 120) c.x = -120;
+    });
+
+    state.birds.forEach(b => {
+        b.x -= b.speed * dt;
+        b.wingPhase += dt * 7;
+        if (b.x < -50) {
+            b.x = width + 50;
+            b.y = 80 + Math.random() * 260;
+        }
+    });
+
+    state.stars.forEach(s => {
+        s.twinkle += dt * 3;
+    });
+
+    // Update stacked rooms wobble spring
+    state.rooms.forEach(r => {
+        if (Math.abs(r.wobble) > 0.0001 || Math.abs(r.wobbleVel) > 0.0001) {
+            const springForce = -r.wobble * 90;
+            r.wobbleVel += springForce * dt;
+            r.wobbleVel *= Math.pow(0.08, dt); // damping
+            r.wobble += r.wobbleVel * dt;
+        }
+    });
+
+    // Update Active Room
+    if (state.mode === 'PLAYING' && state.activeRoom) {
+        const ar = state.activeRoom;
+        const topRoom = state.rooms[state.rooms.length - 1];
+
+        if (ar.state === 'SWINGING') {
+            ar.swingTime += dt;
+            ar.x += ar.vx * dt;
+            if (ar.x <= ar.minX) {
+                ar.x = ar.minX;
+                ar.vx = Math.abs(ar.vx);
+            } else if (ar.x >= ar.maxX) {
+                ar.x = ar.maxX;
+                ar.vx = -Math.abs(ar.vx);
+            }
+            // Gentle crane bobbing
+            ar.y = (topRoom.y - ar.h - 135) + Math.sin(ar.swingTime * 4.5) * 4;
+        } else if (ar.state === 'DROPPING') {
+            ar.vy += 1650 * dt; // Gravity
+            ar.y += ar.vy * dt;
+
+            // Check landing against topRoom
+            if (ar.y + ar.h >= topRoom.y) {
+                evaluateLanding(ar, topRoom);
+            }
+        }
+    }
+
+    // Update Falling Misses
+    for (let i = state.fallingMisses.length - 1; i >= 0; i--) {
+        const m = state.fallingMisses[i];
+        m.vy += 1200 * dt;
+        m.x += m.vx * dt;
+        m.y += m.vy * dt;
+        m.rot += m.vRot * dt;
+        if (m.y + state.cameraY > height + 200) {
+            state.fallingMisses.splice(i, 1);
+        }
+    }
+
+    // Update Particles
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.vy += 280 * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.rotation += p.vRot * dt;
+        p.alpha -= dt * 1.3;
+        if (p.alpha <= 0) state.particles.splice(i, 1);
+    }
+
+    // Update Floating Texts
+    for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+        const ft = state.floatingTexts[i];
+        ft.y += ft.vy * dt;
+        ft.vy *= Math.pow(0.2, dt);
+        ft.life -= dt;
+        ft.alpha = Math.min(1, ft.life * 1.5);
+        if (ft.life <= 0) state.floatingTexts.splice(i, 1);
+    }
+
+    // Camera Movement
+    if (state.mode === 'PANORAMA') {
+        state.panoramaTimer += dt;
+        const duration = Math.min(2.8, Math.max(1.4, state.rooms.length * 0.14));
+        const t = Math.min(state.panoramaTimer / duration, 1);
+        // Smooth easeInOutCubic from top down to 0 (ground)
+        const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        state.cameraY = state.panoramaStartY * (1 - ease);
+
+        if (t >= 1) {
+            showFinalResultCard();
+        }
+    } else {
+        state.cameraY += (state.targetCameraY - state.cameraY) * Math.min(1, dt * 7);
+    }
+}
+
+// --- Rendering Helpers (Pop Illustration Style) ---
+function drawRoundedRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+}
+
+function drawStarShape(cx, cy, spikes, outerR, innerR) {
+    let rot = (Math.PI / 2) * 3;
+    let step = Math.PI / spikes;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - outerR);
+    for (let i = 0; i < spikes; i++) {
+        ctx.lineTo(cx + Math.cos(rot) * outerR, cy + Math.sin(rot) * outerR);
+        rot += step;
+        ctx.lineTo(cx + Math.cos(rot) * innerR, cy + Math.sin(rot) * innerR);
+        rot += step;
+    }
+    ctx.closePath();
+}
+
+function drawSkyBackground() {
+    // Shift sky colors smoothly based on building height (cameraY)
+    const altitude = Math.min(state.cameraY / 1800, 1); // 0 = bright day, 0.5 = sunset, 1 = starry twilight
+
+    const grad = ctx.createLinearGradient(0, 0, 0, height);
+    if (altitude < 0.5) {
+        const t = altitude * 2;
+        grad.addColorStop(0, lerpColor('#5bc0eb', '#ff9e7d', t));
+        grad.addColorStop(1, lerpColor('#d8f3ff', '#ffe599', t));
+    } else {
+        const t = (altitude - 0.5) * 2;
+        grad.addColorStop(0, lerpColor('#ff9e7d', '#2b2d42', t));
+        grad.addColorStop(1, lerpColor('#ffe599', '#6c5ce7', t));
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Stars appear at high altitude
+    if (altitude > 0.35) {
+        const starAlpha = Math.min(1, (altitude - 0.35) * 1.6);
+        state.stars.forEach(s => {
+            const pulse = 0.6 + 0.4 * Math.sin(s.twinkle);
+            ctx.fillStyle = `rgba(255, 253, 230, ${starAlpha * pulse})`;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    // Fluffy Pop Clouds
+    state.clouds.forEach(c => {
+        const screenY = ((c.y + state.cameraY * 0.25) % (height + 240));
+        const drawY = screenY < -120 ? screenY + height + 240 : screenY;
+        ctx.save();
+        ctx.translate(c.x, drawY);
+        ctx.scale(c.scale, c.scale);
+        ctx.fillStyle = altitude > 0.65 ? 'rgba(255, 235, 245, 0.35)' : 'rgba(255, 255, 255, 0.88)';
+        ctx.beginPath();
+        ctx.arc(0, 0, 26, 0, Math.PI * 2);
+        ctx.arc(24, -6, 30, 0, Math.PI * 2);
+        ctx.arc(52, 0, 24, 0, Math.PI * 2);
+        ctx.arc(24, 10, 24, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    });
+
+    // Little V-shaped birds in daytime
+    if (altitude < 0.6) {
+        ctx.strokeStyle = 'rgba(58, 46, 57, 0.45)';
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'round';
+        state.birds.forEach(b => {
+            const by = b.y + state.cameraY * 0.35;
+            if (by > -50 && by < height + 50) {
+                const flap = Math.sin(b.wingPhase) * 4;
+                ctx.beginPath();
+                ctx.moveTo(b.x - 8, by + flap);
+                ctx.quadraticCurveTo(b.x - 4, by - 4, b.x, by);
+                ctx.quadraticCurveTo(b.x + 4, by - 4, b.x + 8, by + flap);
+                ctx.stroke();
+            }
+        });
+    }
+}
+
+function lerpColor(hexA, hexB, t) {
+    const a = parseInt(hexA.slice(1), 16);
+    const b = parseInt(hexB.slice(1), 16);
+    const rA = (a >> 16) & 255, gA = (a >> 8) & 255, bA = a & 255;
+    const rB = (b >> 16) & 255, gB = (b >> 8) & 255, bB = b & 255;
+    const r = Math.round(rA + (rB - rA) * t);
+    const g = Math.round(gA + (gB - gA) * t);
+    const bl = Math.round(bA + (bB - bA) * t);
+    return `rgb(${r},${g},${bl})`;
+}
+
+function drawGround() {
+    const gy = state.groundY + state.cameraY;
+    if (gy > height + 100) return;
+
+    // Lush green hill & sidewalk
+    ctx.fillStyle = '#8ac926';
+    ctx.fillRect(0, gy, width, height - gy + 200);
+
+    // Sidewalk stone strip
+    ctx.fillStyle = '#f4f1de';
+    ctx.fillRect(0, gy, width, 16);
+
+    ctx.strokeStyle = INK_COLOR;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(0, gy);
+    ctx.lineTo(width, gy);
+    ctx.stroke();
+
+    // Cute bushes & flowerpots beside the 1F entrance
+    const entrance = state.rooms[0];
+    if (entrance) {
+        drawBush(entrance.x - 28, gy);
+        drawBush(entrance.x + entrance.w + 28, gy);
+    }
+}
+
+function drawBush(cx, groundY) {
+    ctx.fillStyle = '#52b788';
+    ctx.strokeStyle = INK_COLOR;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx - 12, groundY - 10, 14, Math.PI, 0);
+    ctx.arc(cx + 12, groundY - 10, 14, Math.PI, 0);
+    ctx.arc(cx, groundY - 18, 16, Math.PI * 0.9, Math.PI * 0.1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Little flowers on bush
+    ctx.fillStyle = '#ff7b89';
+    ctx.beginPath();
+    ctx.arc(cx - 8, groundY - 14, 3.5, 0, Math.PI * 2);
+    ctx.arc(cx + 9, groundY - 11, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function drawInteriorDetail(item, wx, wy, ww, wh) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(wx, wy, ww, wh);
+    ctx.clip();
+
+    if (item === 'plant') {
+        // Terracotta pot + leafy plant
+        ctx.fillStyle = '#e07a5f';
+        ctx.fillRect(wx + ww * 0.35, wy + wh - 11, ww * 0.3, 11);
+        ctx.fillStyle = '#52b788';
+        ctx.beginPath();
+        ctx.arc(wx + ww * 0.5, wy + wh - 15, 8, 0, Math.PI * 2);
+        ctx.arc(wx + ww * 0.38, wy + wh - 12, 5, 0, Math.PI * 2);
+        ctx.arc(wx + ww * 0.62, wy + wh - 12, 5, 0, Math.PI * 2);
+        ctx.fill();
+    } else if (item === 'lamp') {
+        // Warm pendant lamp
+        ctx.strokeStyle = INK_COLOR;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(wx + ww * 0.5, wy);
+        ctx.lineTo(wx + ww * 0.5, wy + 10);
+        ctx.stroke();
+        ctx.fillStyle = '#ffd166';
+        ctx.beginPath();
+        ctx.moveTo(wx + ww * 0.3, wy + 16);
+        ctx.lineTo(wx + ww * 0.7, wy + 16);
+        ctx.lineTo(wx + ww * 0.58, wy + 9);
+        ctx.lineTo(wx + ww * 0.42, wy + 9);
+        ctx.closePath();
+        ctx.fill();
+    } else if (item === 'cat') {
+        // Cute cat silhouette sitting on windowsill
+        ctx.fillStyle = '#3a2e39';
+        const cx = wx + ww * 0.55;
+        const cy = wy + wh;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy - 6, 6, 7, 0, 0, Math.PI * 2);
+        ctx.arc(cx, cy - 14, 5, 0, Math.PI * 2);
+        ctx.fill();
+        // Ears
+        ctx.beginPath();
+        ctx.moveTo(cx - 5, cy - 16);
+        ctx.lineTo(cx - 3, cy - 22);
+        ctx.lineTo(cx - 1, cy - 17);
+        ctx.moveTo(cx + 5, cy - 16);
+        ctx.lineTo(cx + 3, cy - 22);
+        ctx.lineTo(cx + 1, cy - 17);
+        ctx.fill();
+    } else if (item === 'sofa') {
+        ctx.fillStyle = '#ff7b89';
+        drawRoundedRect(wx + 4, wy + wh - 12, ww - 8, 12, 4);
+        ctx.fill();
+    } else if (item === 'bookshelf') {
+        ctx.fillStyle = '#b08968';
+        ctx.fillRect(wx + 5, wy + 8, ww - 10, wh - 8);
+        ctx.fillStyle = '#ff595e';
+        ctx.fillRect(wx + 8, wy + 12, 5, 8);
+        ctx.fillStyle = '#1982c4';
+        ctx.fillRect(wx + 14, wy + 11, 5, 9);
+        ctx.fillStyle = '#8ac926';
+        ctx.fillRect(wx + 20, wy + 13, 5, 7);
+    } else if (item === 'painting') {
+        ctx.fillStyle = '#ffd166';
+        ctx.fillRect(wx + ww * 0.25, wy + 7, ww * 0.5, 13);
+        ctx.fillStyle = '#70d6ff';
+        ctx.fillRect(wx + ww * 0.3, wy + 9, ww * 0.4, 9);
+    }
+
+    ctx.restore();
+}
+
+function drawResident(type, rx, ry) {
+    ctx.save();
+    ctx.translate(rx, ry);
+    ctx.strokeStyle = INK_COLOR;
+    ctx.lineWidth = 2.2;
+
+    if (type === 'cat_pet' || type === 'dog_pet') {
+        // Cute pet peeking over balcony
+        ctx.fillStyle = type === 'cat_pet' ? '#ffb703' : '#d4a373';
+        ctx.beginPath();
+        ctx.arc(0, -8, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        // Ears
+        ctx.beginPath();
+        ctx.moveTo(-7, -12);
+        ctx.lineTo(-5, -20);
+        ctx.lineTo(-1, -14);
+        ctx.moveTo(7, -12);
+        ctx.lineTo(5, -20);
+        ctx.lineTo(1, -14);
+        ctx.fill();
+        ctx.stroke();
+        // Eyes
+        ctx.fillStyle = INK_COLOR;
+        ctx.beginPath();
+        ctx.arc(-3, -8, 1.4, 0, Math.PI * 2);
+        ctx.arc(3, -8, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        // Cute chibi person waving
+        ctx.fillStyle = type === 'girl' ? '#ff7b89' : type === 'boy' ? '#4ea8de' : '#b5838d';
+        drawRoundedRect(-8, -12, 16, 12, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Head
+        ctx.fillStyle = '#ffedd8';
+        ctx.beginPath();
+        ctx.arc(0, -19, 8.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Hair
+        ctx.fillStyle = type === 'grandma' ? '#e5e5e5' : '#4a3b32';
+        ctx.beginPath();
+        ctx.arc(0, -21, 8.8, Math.PI, 0);
+        ctx.fill();
+
+        // Happy eyes
+        ctx.fillStyle = INK_COLOR;
+        ctx.beginPath();
+        ctx.arc(-3, -18, 1.3, 0, Math.PI * 2);
+        ctx.arc(3, -18, 1.3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+function drawRoom(room, isGhostGuide = false) {
+    const drawY = room.y + state.cameraY;
+    if (!isGhostGuide && (drawY > height + 150 || drawY + room.h < -200)) return;
+
+    ctx.save();
+    const cx = room.x + room.w / 2;
+    const cy = drawY + room.h;
+    ctx.translate(cx, cy);
+    if (room.wobble) ctx.rotate(room.wobble);
+    if (room.rot) ctx.rotate(room.rot);
+    ctx.translate(-room.w / 2, -room.h);
+
+    const w = room.w;
+    const h = room.h;
+
+    if (room.isEntrance) {
+        // 1F Warm Brick Entrance Lobby
+        ctx.fillStyle = room.theme.wall;
+        ctx.strokeStyle = INK_COLOR;
+        ctx.lineWidth = 3.5;
+        drawRoundedRect(0, 0, w, h, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        // Roof cornice
+        ctx.fillStyle = '#f4f1de';
+        drawRoundedRect(-4, -4, w + 8, 11, 5);
+        ctx.fill();
+        ctx.stroke();
+
+        // Arched Glass Double Doors
+        const doorW = 46;
+        const doorH = 48;
+        const doorX = (w - doorW) / 2;
+        const doorY = h - doorH;
+        ctx.fillStyle = '#caf0f8';
+        ctx.beginPath();
+        ctx.moveTo(doorX, h);
+        ctx.lineTo(doorX, doorY + 18);
+        ctx.arc(doorX + doorW / 2, doorY + 18, doorW / 2, Math.PI, 0);
+        ctx.lineTo(doorX + doorW, h);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Door center line
+        ctx.beginPath();
+        ctx.moveTo(doorX + doorW / 2, doorY);
+        ctx.lineTo(doorX + doorW / 2, h);
+        ctx.stroke();
+
+        // Cute Awning Canopy over door
+        ctx.fillStyle = '#ffd166';
+        drawRoundedRect(doorX - 8, doorY - 6, doorW + 16, 12, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        // Lobby lanterns
+        ctx.fillStyle = '#ffe66d';
+        ctx.beginPath();
+        ctx.arc(doorX - 16, doorY + 14, 5, 0, Math.PI * 2);
+        ctx.arc(doorX + doorW + 16, doorY + 14, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+        return;
+    }
+
+    // Standard / Special Apartment Room
+    ctx.fillStyle = room.theme.wall;
+    ctx.strokeStyle = INK_COLOR;
+    ctx.lineWidth = 3.5;
+    drawRoundedRect(0, 0, w, h, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    // Top decorative trim / slab
+    ctx.fillStyle = room.theme.trim;
+    drawRoundedRect(-2, 0, w + 4, 10, 5);
+    ctx.fill();
+    ctx.stroke();
+
+    // Gold VIP Sparkle Trim
+    if (room.theme.isVip) {
+        ctx.strokeStyle = '#fff3b0';
+        ctx.lineWidth = 2;
+        drawRoundedRect(4, 12, w - 8, h - 16, 5);
+        ctx.stroke();
+    }
+
+    // Two Windows
+    const winW = Math.min(38, w * 0.25);
+    const winH = 34;
+    const winY = 19;
+    const leftWinX = w * 0.16;
+    const rightWinX = w - w * 0.16 - winW;
+
+    [
+        { x: leftWinX, item: room.leftItem },
+        { x: rightWinX, item: room.rightItem }
+    ].forEach((win, idx) => {
+        // Window glass
+        ctx.fillStyle = room.lightsOn || room.theme.isVip ? '#fff3b0' : '#d8f3ff';
+        ctx.strokeStyle = INK_COLOR;
+        ctx.lineWidth = 2.8;
+        drawRoundedRect(win.x, winY, winW, winH, 6);
+        ctx.fill();
+
+        // Interior furniture/cat
+        drawInteriorDetail(win.item, win.x, winY, winW, winH);
+
+        // Curtains on top corners
+        ctx.fillStyle = room.theme.curtain;
+        ctx.beginPath();
+        ctx.moveTo(win.x, winY);
+        ctx.lineTo(win.x + 10, winY);
+        ctx.quadraticCurveTo(win.x + 8, winY + 12, win.x, winY + 15);
+        ctx.closePath();
+        ctx.fill();
+
+        // Window frame outline & sill
+        drawRoundedRect(win.x, winY, winW, winH, 6);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        drawRoundedRect(win.x - 3, winY + winH - 2, winW + 6, 5, 2.5);
+        ctx.fill();
+        ctx.stroke();
+    });
+
+    // Floor Number Plate in center
+    ctx.fillStyle = '#fffdf7';
+    ctx.strokeStyle = INK_COLOR;
+    ctx.lineWidth = 2;
+    drawRoundedRect(w / 2 - 15, winY + 6, 30, 18, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = INK_COLOR;
+    ctx.font = '800 10px "M PLUS Rounded 1c", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${room.floor}F`, w / 2, winY + 15.5);
+
+    // Balcony or Jacuzzi Railing
+    if (room.hasBalcony) {
+        const balW = w * 0.44;
+        const balH = 18;
+        const balX = room.balconySide === 'left' ? -6 : w - balW + 6;
+        const balY = h - balH;
+
+        // If Resident moved into this room, draw them standing on the balcony!
+        if (room.resident) {
+            drawResident(room.resident, balX + balW * 0.5, balY + 4);
+        }
+
+        // Jacuzzi bubbles if Jacuzzi room
+        if (room.theme.isJacuzzi) {
+            ctx.fillStyle = '#ffffff';
+            for (let b = 0; b < 5; b++) {
+                ctx.beginPath();
+                ctx.arc(balX + 10 + b * 11, balY - 2, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Railing frame
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+        ctx.strokeStyle = INK_COLOR;
+        ctx.lineWidth = 2.6;
+        drawRoundedRect(balX, balY, balW, balH, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Vertical bars
+        ctx.beginPath();
+        for (let bx = balX + 8; bx < balX + balW - 4; bx += 8) {
+            ctx.moveTo(bx, balY);
+            ctx.lineTo(bx, balY + balH);
+        }
+        ctx.stroke();
+    } else if (room.resident) {
+        // Resident peeking near center if no balcony
+        drawResident(room.resident, w * 0.5, 14);
+    }
+
+    // Crane Hook & Drop Guide when active
+    if (isGhostGuide && room.state === 'SWINGING') {
+        // Crane cable above room
+        ctx.strokeStyle = INK_COLOR;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(w / 2, -200);
+        ctx.lineTo(w / 2, -10);
+        ctx.stroke();
+
+        // Cute hook clasp
+        ctx.fillStyle = '#ffd166';
+        ctx.beginPath();
+        ctx.arc(w / 2, -6, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+function drawDropGuideLine() {
+    if (state.mode !== 'PLAYING' || !state.activeRoom || state.activeRoom.state !== 'SWINGING') return;
+    const ar = state.activeRoom;
+    const topRoom = state.rooms[state.rooms.length - 1];
+
+    const startY = ar.y + ar.h + state.cameraY;
+    const endY = topRoom.y + state.cameraY;
+
+    ctx.save();
+    ctx.setLineDash([6, 6]);
+    ctx.strokeStyle = 'rgba(58, 46, 57, 0.25)';
+    ctx.lineWidth = 2;
+
+    // Left & right subtle drop alignment lines
+    ctx.beginPath();
+    ctx.moveTo(ar.x, startY);
+    ctx.lineTo(ar.x, endY);
+    ctx.moveTo(ar.x + ar.w, startY);
+    ctx.lineTo(ar.x + ar.w, endY);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawParticlesAndText() {
+    // Particles
+    state.particles.forEach(p => {
+        ctx.save();
+        ctx.translate(p.x, p.y + state.cameraY);
+        ctx.rotate(p.rotation);
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.fillStyle = p.color;
+        ctx.strokeStyle = INK_COLOR;
+        ctx.lineWidth = 1.5;
+
+        if (p.isStar) {
+            drawStarShape(0, 0, 5, p.size, p.size * 0.45);
+            ctx.fill();
+            ctx.stroke();
+        } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    });
+
+    // Floating Score / Feedback Popups
+    state.floatingTexts.forEach(ft => {
+        ctx.save();
+        const sy = ft.y + state.cameraY;
+        ctx.globalAlpha = Math.max(0, ft.alpha);
+        ctx.font = `800 ${Math.round(18 * ft.scale)}px "M PLUS Rounded 1c", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#fffdf7';
+        ctx.strokeText(ft.text, ft.x, sy);
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ft.x, sy);
+        ctx.restore();
+    });
+}
+
+// --- Main Render Loop ---
+function render() {
+    drawSkyBackground();
+    drawGround();
+
+    // Draw stacked rooms from bottom (1F) up
+    for (let i = 0; i < state.rooms.length; i++) {
+        drawRoom(state.rooms[i], false);
+    }
+
+    // Draw falling missed rooms
+    for (let i = 0; i < state.fallingMisses.length; i++) {
+        drawRoom(state.fallingMisses[i], false);
+    }
+
+    // Draw active swinging/dropping room + guide
+    if (state.activeRoom) {
+        drawDropGuideLine();
+        drawRoom(state.activeRoom, true);
+    }
+
+    drawParticlesAndText();
+}
+
+function gameLoop(now) {
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+
+    update(dt);
+    render();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Initialize & Start Loop
+initBackground();
+state.groundY = height - 65;
+state.baseRoomWidth = Math.min(Math.max(width * 0.42, 136), 195);
+state.rooms.push(createRoom(1, (width - (state.baseRoomWidth + 16)) / 2, state.groundY - 76, state.baseRoomWidth + 16, 66, true));
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
+```
