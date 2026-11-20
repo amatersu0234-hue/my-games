@@ -1,0 +1,658 @@
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ポコポコ！夢のマンション建設</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #3a2e39;
+            --cream: #fffdf7;
+            --coral: #ff7b89;
+            --mint: #7ae582;
+            --yellow: #ffd166;
+            --sky: #70d6ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #8be0ff;
+            color: var(--ink);
+            touch-action: manipulation;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* HUD (Top Bar) */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            background: var(--cream);
+            border: 3px solid var(--ink);
+            border-radius: 16px;
+            padding: 6px 14px;
+            box-shadow: 0 4px 0 var(--ink);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 800;
+            font-size: 1rem;
+        }
+
+        .badge-label {
+            font-size: 0.75rem;
+            color: #7a6b78;
+        }
+
+        .badge-value {
+            font-size: 1.15rem;
+            color: var(--ink);
+        }
+
+        #combo-badge {
+            background: var(--yellow);
+            transform: scale(0);
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #combo-badge.active {
+            transform: scale(1);
+        }
+
+        #sound-btn {
+            pointer-events: auto;
+            background: var(--cream);
+            border: 3px solid var(--ink);
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.25rem;
+            cursor: pointer;
+            box-shadow: 0 4px 0 var(--ink);
+            transition: transform 0.1s;
+        }
+
+        #sound-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 var(--ink);
+        }
+
+        /* Event Banner (Resident Move-in / Bonus) */
+        #event-banner {
+            position: absolute;
+            top: 76px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px) scale(0.9);
+            background: linear-gradient(135deg, #fff5b8 0%, #ffd166 100%);
+            border: 3px solid var(--ink);
+            border-radius: 24px;
+            padding: 8px 20px;
+            box-shadow: 0 5px 0 var(--ink);
+            font-weight: 800;
+            font-size: 1rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 15;
+            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #event-banner.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0) scale(1);
+        }
+
+        /* Overlays (Start & Game Over) */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(58, 46, 57, 0.45);
+            backdrop-filter: blur(3px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            z-index: 20;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .card {
+            background: var(--cream);
+            border: 4px solid var(--ink);
+            border-radius: 28px;
+            padding: 28px 24px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 8px 0 var(--ink);
+            animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .title-tag {
+            display: inline-block;
+            background: var(--coral);
+            color: white;
+            font-weight: 800;
+            font-size: 0.85rem;
+            padding: 4px 12px;
+            border-radius: 99px;
+            border: 2.5px solid var(--ink);
+            margin-bottom: 8px;
+        }
+
+        h1 {
+            margin: 0 0 12px 0;
+            font-size: 1.75rem;
+            line-height: 1.3;
+            color: var(--ink);
+            text-shadow: 2px 2px 0px #ffd166;
+        }
+
+        .rules-box {
+            background: #f3efe6;
+            border: 2.5px dashed #b8aeb6;
+            border-radius: 16px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            text-align: left;
+        }
+
+        .rules-box div {
+            margin-bottom: 4px;
+        }
+
+        .rules-box div:last-child {
+            margin-bottom: 0;
+        }
+
+        .btn-primary {
+            background: linear-gradient(180deg, #ff8fa3 0%, #ff6b81 100%);
+            color: white;
+            font-family: inherit;
+            font-weight: 800;
+            font-size: 1.25rem;
+            border: 3.5px solid var(--ink);
+            border-radius: 99px;
+            padding: 14px 32px;
+            width: 100%;
+            cursor: pointer;
+            box-shadow: 0 6px 0 var(--ink);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.05);
+        }
+
+        .btn-primary:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 var(--ink);
+        }
+
+        /* Result Stats */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 16px 0 20px 0;
+        }
+
+        .stat-item {
+            background: #f3efe6;
+            border: 2.5px solid var(--ink);
+            border-radius: 16px;
+            padding: 10px;
+        }
+
+        .stat-item.full {
+            grid-column: span 2;
+            background: #fff5b8;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #6e5f6c;
+        }
+
+        .stat-val {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--ink);
+        }
+
+        /* Panorama Hint during Game Over camera pan */
+        #panorama-banner {
+            position: absolute;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--cream);
+            border: 3px solid var(--ink);
+            border-radius: 99px;
+            padding: 8px 20px;
+            font-weight: 800;
+            font-size: 0.95rem;
+            box-shadow: 0 4px 0 var(--ink);
+            z-index: 18;
+            display: none;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 480px) {
+            .badge { padding: 5px 10px; font-size: 0.9rem; }
+            .badge-value { font-size: 1rem; }
+            h1 { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Top HUD -->
+    <div id="hud">
+        <div class="hud-group">
+            <div class="badge">
+                <span class="badge-label">高さ</span>
+                <span class="badge-value" id="floor-display">1F</span>
+            </div>
+            <div class="badge">
+                <span class="badge-label">スコア</span>
+                <span class="badge-value" id="score-display">0</span>
+            </div>
+            <div class="badge" id="combo-badge">
+                <span id="combo-display">2 COMBO!</span>
+            </div>
+        </div>
+
+        <div class="hud-group" style="align-items: center;">
+            <div class="badge" id="lives-display">❤️❤️❤️</div>
+            <button id="sound-btn" title="サウンド切り替え">🔊</button>
+        </div>
+    </div>
+
+    <!-- Event Banner -->
+    <div id="event-banner">🏠 住民が入居しました！ ✨</div>
+
+    <!-- Panorama Tour Indicator -->
+    <div id="panorama-banner">🏢 完成したマンションを見学中…</div>
+
+    <!-- Start Overlay -->
+    <div class="overlay" id="start-overlay">
+        <div class="card">
+            <div class="title-tag">ポップな積み上げ落ちゲー</div>
+            <h1>ポコポコ！<br>夢のマンション建設</h1>
+            <div class="rules-box">
+                <div>👆 <b>タップ / クリック / スペース</b> で部屋を落とそう！</div>
+                <div>✨ ピッタリ重なると <b>PERFECT</b> ボーナス！</div>
+                <div>💦 ズレるとスコア<b>減点</b>＆段差ができるよ</div>
+                <div>👑 たまにレアな<b>VIPルーム</b>や<b>住民入居</b>も！</div>
+            </div>
+            <button class="btn-primary" id="start-btn">建設スタート！🏗️</button>
+        </div>
+    </div>
+
+    <!-- Result Overlay -->
+    <div class="overlay hidden" id="result-overlay">
+        <div class="card">
+            <div class="title-tag" style="background: #70d6ff; color: var(--ink);">建設完了！</div>
+            <h1 id="result-title">立派なマンション完成！</h1>
+            <div class="stat-grid">
+                <div class="stat-item full">
+                    <div class="stat-label">トータルスコア</div>
+                    <div class="stat-val" id="final-score">0 pt</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">到達した高さ</div>
+                    <div class="stat-val" id="final-floor">1F</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">PERFECT回数</div>
+                    <div class="stat-val" id="final-perfect">0 回</div>
+                </div>
+            </div>
+            <button class="btn-primary" id="restart-btn">もう一回建てる！🔨</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * ポコポコ！夢のマンション建設 (Pop Mansion Stacker)
+ * Single-file 2D Canvas Game with Procedural Pop-Illustration & Web Audio SFX
+ */
+
+// --- Audio Engine (Web Audio API Synthesizer) ---
+class SoundManager {
+    constructor() {
+        this.ctx = null;
+        this.muted = false;
+    }
+
+    init() {
+        if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioCtx();
+        }
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+    }
+
+    toggleMute() {
+        this.muted = !this.muted;
+        return this.muted;
+    }
+
+    playDrop() {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(220, now + 0.16);
+
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.16);
+    }
+
+    playLand(isDeduction = false) {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        // Soft thud
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(isDeduction ? 150 : 190, now);
+        osc.frequency.exponentialRampToValueAtTime(65, now + 0.12);
+
+        gain.gain.setValueAtTime(0.28, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.12);
+
+        // Deduction comical blip if offset
+        if (isDeduction) {
+            const osc2 = this.ctx.createOscillator();
+            const gain2 = this.ctx.createGain();
+            osc2.type = 'sawtooth';
+            osc2.frequency.setValueAtTime(280, now + 0.05);
+            osc2.frequency.linearRampToValueAtTime(210, now + 0.18);
+            gain2.gain.setValueAtTime(0.08, now + 0.05);
+            gain2.gain.exponentialRampToValueAtTime(0.005, now + 0.18);
+            osc2.connect(gain2);
+            gain2.connect(this.ctx.destination);
+            osc2.start(now + 0.05);
+            osc2.stop(now + 0.18);
+        }
+    }
+
+    playPerfect(combo = 1) {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const baseFreq = 523.25 * Math.pow(1.06, Math.min(combo - 1, 10)); // Pitch climbs with combo
+        const notes = [baseFreq, baseFreq * 1.25, baseFreq * 1.5];
+
+        notes.forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + i * 0.045);
+
+            gain.gain.setValueAtTime(0.16, now + i * 0.045);
+            gain.gain.exponentialRampToValueAtTime(0.005, now + i * 0.045 + 0.25);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + i * 0.045);
+            osc.stop(now + i * 0.045 + 0.25);
+        });
+    }
+
+    playFanfare() {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + i * 0.07);
+            gain.gain.setValueAtTime(0.18, now + i * 0.07);
+            gain.gain.exponentialRampToValueAtTime(0.005, now + i * 0.07 + 0.35);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + i * 0.07);
+            osc.stop(now + i * 0.07 + 0.35);
+        });
+    }
+
+    playMiss() {
+        if (this.muted || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.linearRampToValueAtTime(110, now + 0.4);
+
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.005, now + 0.4);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.4);
+    }
+}
+
+const sfx = new SoundManager();
+
+// --- Game Constants & Palettes ---
+const INK_COLOR = '#3a2e39';
+const ROOM_THEMES = [
+    { name: 'mint', wall: '#9be7ac', trim: '#58b368', curtain: '#fffdf7' },
+    { name: 'coral', wall: '#ff9aa2', trim: '#e05a6d', curtain: '#fff5b8' },
+    { name: 'yellow', wall: '#ffe082', trim: '#f4a261', curtain: '#ffffff' },
+    { name: 'sky', wall: '#90dbf4', trim: '#4ea8de', curtain: '#ffccd5' },
+    { name: 'lavender', wall: '#cdb4db', trim: '#9d4edd', curtain: '#fffdf7' },
+    { name: 'peach', wall: '#ffcab0', trim: '#f77f00', curtain: '#e0fbfc' }
+];
+
+const VIP_THEME = { name: 'vip', wall: '#ffe66d', trim: '#f59f00', curtain: '#ff595e', isVip: true };
+const JACUZZI_THEME = { name: 'jacuzzi', wall: '#80ffdb', trim: '#00bbf9', curtain: '#ffffff', isJacuzzi: true };
+
+const INTERIOR_ITEMS = ['plant', 'lamp', 'cat', 'sofa', 'bookshelf', 'painting'];
+const RESIDENT_TYPES = ['girl', 'boy', 'cat_pet', 'dog_pet', 'grandma'];
+
+// --- Canvas Setup ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let width = 0;
+let height = 0;
+let dpr = 1;
+
+function resizeCanvas() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// --- Game State ---
+const state = {
+    mode: 'START', // START, PLAYING, PANORAMA, GAMEOVER
+    score: 0,
+    lives: 3,
+    combo: 0,
+    perfectCount: 0,
+    rooms: [], // Stacked rooms (index 0 = 1F entrance)
+    activeRoom: null, // Currently swinging or dropping room
+    fallingMisses: [], // Rooms that missed and are tumbling down
+    particles: [],
+    floatingTexts: [],
+    clouds: [],
+    stars: [],
+    birds: [],
+    cameraY: 0,
+    targetCameraY: 0,
+    panoramaTimer: 0,
+    panoramaStartY: 0,
+    baseRoomWidth: 160,
+    roomHeight: 68,
+    groundY: 0
+};
+
+// Initialize ambient background elements
+function initBackground() {
+    state.clouds = [];
+    for (let i = 0; i < 8; i++) {
+        state.clouds.push({
+            x: Math.random() * width,
+            y: Math.random() * height * 2 - height,
+            scale: 0.6 + Math.random() * 0.8,
+            speed: 8 + Math.random() * 14
+        });
+    }
+    state.stars = [];
+    for (let i = 0; i < 60; i++) {
+        state.stars.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            size: 1.5 + Math.random() * 2.5,
+            twinkle: Math.random() * Math.PI * 2
+        });
+    }
+    state.birds = [];
+    for (let i = 0; i < 3; i++) {
+        state.birds.push({
+            x: Math.random() * width,
+            y: 120 + Math.random() * 250,
+            speed: 35 + Math.random() * 25,
+            wingPhase: Math.random() * Math.PI * 2
+        });
+    }
+}
+
+// --- Room Factory ---
+function createRoom(floorNum, x, y, w, h, isEntrance = false) {
+    if (isEntrance) {
+        return {
+            floor: 1,
+            x, y, w, h: h + 10,
+            isEntrance: true,
+            theme: { wall: '#e07a5f', trim: '#9e2a2b' },
+            wobble: 0,
+            wobbleVel: 0,
+            resident: null,
+            lightsOn: true
+        };
+    }
+
+    // Decide if special room (every 4-6 floors or 15% chance after floor 2)
+    let theme;
+    const roll = Math.random();
+    if (floorNum > 2 && roll < 0.11) {
+        theme = VIP_THEME;
+    } else if (floorNum > 2 && roll < 0.20) {
+        theme = JACUZZI_THEME;
+    } else {
+        theme = ROOM_THEMES[(floorNum + Math.floor(Math.random() * 3)) % ROOM_THEMES.length];
+    }
+
+    const leftItem = INTERIOR_ITEMS[Math.floor(Math.random() * INTERIOR_ITEMS.length)];
+    let rightItem = INTERIOR_ITEMS[Math.floor(Math.random() * INTERIOR_ITEMS.length)];
+    if (rightItem === leftItem) {
+        rightItem = INTERIOR_ITEMS[(INTERIOR_ITEMS.indexOf(leftItem) + 1) % INTERIOR_ITEMS.length];
+    }
+
+    return {
+        floor: floorNum,
+        x, y, w, h,
+        isEntrance: false,
+        theme,
+        hasBalcony: theme.isJacuzzi || Math.random() < 0.55,
+        balconySide: Math.random() < 0.5 ? 'left' : 'right',
+        leftItem,
+        rightItem,
+        wobble: 0,
+        wobbleVel: 0,
+        resident: null, // Populated during move-in events!
+ 
