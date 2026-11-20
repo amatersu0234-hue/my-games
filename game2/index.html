@@ -1,1 +1,1381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>絵本の3Dポップアップタウン - Pop-up Storybook Town</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500&family=Yomogi&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --desk-bg: #dbd0bc;
+            --paper-base: #fcf6e8;
+            --ink-main: #473b2f;
+            --pencil-line: #6d5c4c;
+        }
 
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Kiwi Maru', serif;
+            color: var(--ink-main);
+            background-color: var(--desk-bg);
+            background-image:
+                radial-gradient(circle at 15% 15%, rgba(244, 162, 162, 0.22) 0%, transparent 45%),
+                radial-gradient(circle at 85% 85%, rgba(155, 196, 226, 0.25) 0%, transparent 45%),
+                repeating-linear-gradient(90deg, rgba(109, 92, 76, 0.04) 0px, rgba(109, 92, 76, 0.04) 1px, transparent 1px, transparent 20px);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+        }
+
+        /* 絵本のハードカバー枠 */
+        .book-cover {
+            width: 100%;
+            max-width: 1060px;
+            min-height: 94vh;
+            background: #967556;
+            border: 3px solid #56402b;
+            border-radius: 22px;
+            padding: 7px;
+            margin: 6px;
+            box-shadow:
+                0 18px 36px rgba(56, 40, 25, 0.28),
+                inset 0 2px 4px rgba(255, 255, 255, 0.25);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* 見開きページ本体 */
+        .book-pages {
+            flex: 1;
+            background: linear-gradient(90deg,
+                #fcf6e8 0%,
+                #fdf9ef 48.6%,
+                #dfd1b8 49.7%,
+                #cbb89a 50%,
+                #dfd1b8 50.3%,
+                #fdf9ef 51.4%,
+                #fcf6e8 100%);
+            border-radius: 16px;
+            border: 2px solid var(--pencil-line);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow:
+                inset 0 0 24px rgba(190, 170, 138, 0.42),
+                0 3px 0 #e6d9c1,
+                0 6px 0 #d4c3a6;
+        }
+
+        /* 画用紙の繊維テクスチャ */
+        .paper-grain {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.28;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.26'/%3E%3C/svg%3E");
+            z-index: 30;
+        }
+
+        .sketch-box {
+            border: 2px solid var(--pencil-line);
+            border-radius: 14px 18px 15px 17px / 17px 14px 18px 15px;
+            background: rgba(255, 253, 247, 0.88);
+            box-shadow: 2px 3px 0 rgba(109, 92, 76, 0.18);
+        }
+
+        .paper-btn {
+            border: 2px solid var(--pencil-line);
+            border-radius: 14px 18px 16px 17px / 17px 14px 18px 16px;
+            box-shadow: 0 3px 0 var(--pencil-line);
+            transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.15s ease;
+            cursor: pointer;
+        }
+        .paper-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            filter: brightness(1.03);
+        }
+        .paper-btn:active:not(:disabled) {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 var(--pencil-line);
+        }
+        .paper-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+        .paper-btn.selected-tool {
+            outline: 3px solid #e07a5f;
+            background-color: #fff3d6 !important;
+            transform: translateY(-2px);
+        }
+
+        /* 3Dキャンバスコンテナ */
+        #canvasContainer {
+            position: relative;
+            width: 100%;
+            flex: 1;
+            min-height: 340px;
+            border: 2px solid var(--pencil-line);
+            border-radius: 16px;
+            overflow: hidden;
+            background: linear-gradient(180deg, #e4f2f8 0%, #d8ebdd 60%, #c4e0b9 100%);
+            box-shadow: inset 0 4px 16px rgba(85, 110, 75, 0.2);
+        }
+
+        /* コイン・コンボのふわっと浮かぶテキスト */
+        @keyframes floatUpFade {
+            0% { transform: translateY(4px) scale(0.85); opacity: 0; }
+            25% { transform: translateY(-4px) scale(1.05); opacity: 1; }
+            100% { transform: translateY(-32px) scale(0.95); opacity: 0; }
+        }
+        .floating-toast {
+            position: absolute;
+            pointer-events: none;
+            z-index: 40;
+            animation: floatUpFade 1.35s ease-out forwards;
+        }
+
+        /* シール質感 */
+        .medal-sticker {
+            background: linear-gradient(135deg, #ffffff 0%, #fffaf0 60%, #f1e6d2 100%);
+            border: 2px solid #ffffff;
+            outline: 1.5px solid #8c7a6b;
+            border-radius: 14px;
+            box-shadow: 0 3px 6px rgba(70, 58, 46, 0.2);
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c4b299;
+            border-radius: 999px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="book-cover">
+        <div class="book-pages">
+            <div class="paper-grain"></div>
+
+            <!-- ==================== 上部ヘッダー（ステータス＆時間帯・図鑑） ==================== -->
+            <header class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2 border-b-2 border-dashed border-[#cbb89a] bg-[#fffaf0]/85 z-30">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl sm:text-2xl">📖</span>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <h1 class="font-bold text-sm sm:text-base tracking-wide">絵本の3Dポップアップタウン</h1>
+                            <span id="townRankBadge" class="px-2 py-0.5 text-[10px] sm:text-xs font-bold rounded-full bg-[#f6d57e] border border-[#6d5c4c]">
+                                Lv.1 はじまりのジオラマ
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ステータス -->
+                <div class="flex items-center gap-1.5 sm:gap-2.5 text-xs sm:text-sm">
+                    <div class="sketch-box px-2.5 py-1 flex items-center gap-1 bg-[#fff7e0]">
+                        <span>🪙</span>
+                        <span id="statCoins" class="font-bold text-[#9c6615]">140</span>
+                    </div>
+                    <div class="sketch-box px-2.5 py-1 flex items-center gap-1 bg-[#ffeff0]">
+                        <span>🌟</span>
+                        <span id="statHappy" class="font-bold text-[#b84a5a]">12</span>
+                    </div>
+                    <div class="sketch-box px-2.5 py-1 flex items-center gap-1 bg-[#eef6fc]">
+                        <span>📚</span>
+                        <span id="statStory" class="font-bold text-[#3f759c]">0</span>
+                    </div>
+                </div>
+
+                <!-- ツール・時間帯・図鑑・音声 -->
+                <div class="flex items-center gap-1.5">
+                    <button onclick="cycleTimeOfDay()" id="timeToggleBtn" class="paper-btn bg-[#e8f4fa] px-2.5 py-1 text-xs font-bold flex items-center gap-1">
+                        <span id="timeIcon">☀️</span>
+                        <span id="timeLabel">おひる</span>
+                    </button>
+                    <button onclick="openBookmarkModal('residents')" class="paper-btn bg-[#f4a2a2]/75 hover:bg-[#f4a2a2] px-2.5 py-1 text-xs font-bold flex items-center gap-1">
+                        <span>🔖</span>
+                        <span>しおり図鑑</span>
+                        <span id="questAlertDot" class="hidden w-2 h-2 rounded-full bg-[#e63946]"></span>
+                    </button>
+                    <button onclick="toggleAudio()" class="paper-btn bg-[#f5efe2] px-2 py-1 text-xs">
+                        <span id="audioIcon">🔊</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- ==================== メイン見開きエリア ==================== -->
+            <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-2.5 p-2.5 sm:p-3.5 z-20 overflow-y-auto">
+
+                <!-- 【左〜中央：3Dジオラマステージ ＆ 建築パレット】 -->
+                <section class="lg:col-span-8 flex flex-col justify-between gap-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+                        <div class="flex items-center gap-1.5 text-xs text-[#5c4d41]">
+                            <span>✒️</span>
+                            <span id="newsTicker" class="font-medium">絵本の見開きステージをマウスや指で回転させて3Dジオラマを楽しもう！</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="collectAllIncome()" class="paper-btn bg-[#f6d57e] hover:bg-[#f8df9b] px-3 py-1 text-xs font-bold flex items-center gap-1">
+                                <span>🪙</span>
+                                <span>どんぐり収穫 (+<span id="pendingIncomeText">0</span>)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 3D Canvas Container -->
+                    <div id="canvasContainer">
+                        <!-- 3D空間内に収穫ポップアップが重なる要素 -->
+                    </div>
+
+                    <!-- 工作トレー（建築カタログ） -->
+                    <div class="sketch-box p-2 sm:p-2.5 bg-[#fffaf0]/95">
+                        <div class="flex items-center justify-between mb-1.5 px-1">
+                            <span class="text-xs font-bold text-[#5c4d41]">✂️ ポップアップ工作トレー（建てる建物を選んでマスをタップ！）</span>
+                            <div class="flex items-center gap-1">
+                                <button onclick="selectTool('inspect')" id="tool_inspect" class="paper-btn selected-tool bg-[#eef6fa] px-2.5 py-0.5 text-[11px] font-bold">
+                                    👆 みる・強化
+                                </button>
+                                <button onclick="selectTool('demolish')" id="tool_demolish" class="paper-btn bg-[#fae3e3] px-2.5 py-0.5 text-[11px] font-bold">
+                                    🧹 撤去
+                                </button>
+                            </div>
+                        </div>
+                        <div id="buildPalette" class="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                            <!-- JSで描画 -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 【右ページ：建物詳細・コンボ・住民クエスト】 -->
+                <aside class="lg:col-span-4 flex flex-col justify-between gap-2.5">
+
+                    <!-- 1. ルーペ詳細 -->
+                    <div class="sketch-box p-3 bg-[#fffdf7]/95" id="inspectorPanel">
+                        <div class="flex items-center justify-between border-b border-dashed border-[#cbb89a] pb-1.5 mb-2">
+                            <span class="text-xs font-bold text-[#5c4d41]">🔍 3Dまちのルーペ</span>
+                            <span id="inspectorBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-[#e8f4fa] font-bold">探索モード</span>
+                        </div>
+                        <div id="inspectorContent" class="text-xs leading-relaxed text-[#473b2f] min-h-[90px] flex flex-col justify-center">
+                            <p class="text-[#7a6b5b] text-center">
+                                工作トレーから建物を選んで3Dステージのマスをタップするか、<br>ジオラマ上の建物をタップして様子を見てみよう！
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 2. 住人のおねがいごと -->
+                    <div class="sketch-box p-3 bg-[#faf3e4]/95 flex-1 flex flex-col">
+                        <div class="flex items-center justify-between border-b border-dashed border-[#cbb89a] pb-1.5 mb-2">
+                            <span class="text-xs font-bold text-[#5c4d41]">💌 住民のおねがいごと</span>
+                            <span id="residentCountBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-[#98d4bb] font-bold">住人 1人</span>
+                        </div>
+                        <div id="questListArea" class="space-y-2 overflow-y-auto max-h-[175px] pr-0.5 flex-1">
+                            <!-- JS描画 -->
+                        </div>
+                    </div>
+
+                    <!-- 3. おとぎ話コンボ -->
+                    <div class="sketch-box p-2.5 bg-[#fffaf0]/95">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-xs font-bold text-[#5c4d41]">✨ 発生中のおとぎ話コンボ</span>
+                            <span id="comboCountText" class="text-[10px] text-[#7a6b5b]">0個発動中</span>
+                        </div>
+                        <div id="activeCombosBar" class="flex flex-wrap gap-1 min-h-[28px] items-center">
+                            <span class="text-[11px] text-[#8c7a6b]">建物を隣り合わせに並べるとコンボが生まれます！</span>
+                        </div>
+                    </div>
+
+                </aside>
+            </main>
+        </div>
+    </div>
+
+    <!-- ==================== しおり図鑑モーダル ==================== -->
+    <div id="bookmarkModal" class="hidden fixed inset-0 bg-[#382b1e]/50 backdrop-blur-[1px] z-50 flex items-center justify-center p-3">
+        <div class="sketch-box bg-[#fffdf7] w-full max-w-xl max-h-[86vh] flex flex-col p-4 sm:p-5">
+            <div class="flex items-center justify-between border-b-2 border-dashed border-[#cbb89a] pb-2 mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🔖</span>
+                    <h2 class="font-bold text-base sm:text-lg">絵本のまち・しおり図鑑</h2>
+                </div>
+                <button onclick="closeBookmarkModal()" class="paper-btn bg-[#efe4ce] px-3 py-1 text-xs font-bold">とじる</button>
+            </div>
+
+            <div class="flex gap-1.5 mb-3">
+                <button onclick="switchBookmarkTab('residents')" id="tab_residents" class="paper-btn bg-[#f6d57e] px-3 py-1 text-xs font-bold flex-1">🐾 住民図鑑</button>
+                <button onclick="switchBookmarkTab('combos')" id="tab_combos" class="paper-btn bg-[#f5efe2] px-3 py-1 text-xs font-bold flex-1">✨ おとぎ話コンボ</button>
+                <button onclick="switchBookmarkTab('stickers')" id="tab_stickers" class="paper-btn bg-[#f5efe2] px-3 py-1 text-xs font-bold flex-1">🏷️ 記念シール帳</button>
+            </div>
+
+            <div id="bookmarkContentArea" class="overflow-y-auto space-y-2.5 pr-1 flex-1"></div>
+        </div>
+    </div>
+
+    <script>
+        /* ==========================================================================
+           Web Audio API 音声効果音エンジン
+           ========================================================================== */
+        class TownSound {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+            init() {
+                if (!this.ctx) {
+                    const AC = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AC();
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            }
+            playTone(freq, type = 'sine', dur = 0.2, vol = 0.09, delay = 0) {
+                if (this.muted) return;
+                try {
+                    this.init();
+                    const t = this.ctx.currentTime + delay;
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, t);
+                    g.gain.setValueAtTime(0.001, t);
+                    g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+                    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+                    osc.connect(g);
+                    g.connect(this.ctx.destination);
+                    osc.start(t);
+                    osc.stop(t + dur + 0.02);
+                } catch (e) {}
+            }
+            buildPop() {
+                this.playTone(392.0, 'triangle', 0.14, 0.12, 0);
+                this.playTone(523.25, 'sine', 0.18, 0.11, 0.05);
+                this.playTone(659.25, 'triangle', 0.22, 0.09, 0.1);
+            }
+            upgradeChime() {
+                [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+                    this.playTone(f, 'triangle', 0.26, 0.09, i * 0.06);
+                });
+            }
+            coinSparkle() {
+                this.playTone(987.77, 'sine', 0.12, 0.09, 0);
+                this.playTone(1318.5, 'sine', 0.22, 0.09, 0.06);
+            }
+            questComplete() {
+                [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => {
+                    this.playTone(f, 'triangle', 0.3, 0.1, i * 0.08);
+                });
+            }
+            tapSoft() {
+                this.playTone(460, 'sine', 0.07, 0.07, 0);
+            }
+            removeSoft() {
+                this.playTone(330, 'sine', 0.1, 0.08, 0);
+                this.playTone(260, 'sine', 0.12, 0.07, 0.05);
+            }
+        }
+        const sfx = new TownSound();
+
+        function toggleAudio() {
+            sfx.muted = !sfx.muted;
+            document.getElementById('audioIcon').textContent = sfx.muted ? '🔇' : '🔊';
+            if (!sfx.muted) sfx.tapSoft();
+        }
+
+        /* ==========================================================================
+           建築カタログ定義（全8種）
+           ========================================================================== */
+        const BUILDINGS = {
+            house: { id: 'house', name: '三角屋根のおうち', icon: '🏡', cost: 30, income: 6, happy: 5, story: 6, desc: '赤い三角屋根の可愛いおうち。住人が安心して暮らします。' },
+            flower: { id: 'flower', name: 'いろどりお花畑', icon: '🌷', cost: 18, income: 3, happy: 8, story: 4, desc: '色鮮やかなチューリップが咲くお花畑。ハッピー度を高めます。' },
+            bakery: { id: 'bakery', name: '焼きたてパン屋', icon: '🥐', cost: 45, income: 14, happy: 6, story: 10, desc: '香ばしいパンが焼き上がる人気のパン屋さん。' },
+            fountain: { id: 'fountain', name: 'きらきら噴水広場', icon: '⛲', cost: 55, income: 6, happy: 14, story: 12, desc: '住民たちが集まっておしゃべりする憩いの広場。' },
+            windmill: { id: 'windmill', name: 'そよ風の風車', icon: '🎡', cost: 65, income: 18, happy: 7, story: 15, desc: '大きな羽根がゆっくり回る風車。街を豊かにします。' },
+            library: { id: 'library', name: '森の絵本図書館', icon: '📚', cost: 80, income: 9, happy: 12, story: 22, desc: '世界中のおとぎ話が集まる静かな図書館。' },
+            clocktower: { id: 'clocktower', name: '星見の時計塔', icon: '🕰️', cost: 100, income: 16, happy: 14, story: 26, desc: '優しい鐘の音で時間を知らせるシンボルタワー。' },
+            sweets: { id: 'sweets', name: 'お菓子の夢ハウス', icon: '🧁', cost: 130, income: 26, happy: 22, story: 32, desc: 'ビスケットの壁とクリームの屋根でできた夢のお菓子の家！' }
+        };
+
+        /* ==========================================================================
+           隣接コンボ定義（全6種）
+           ========================================================================== */
+        const COMBOS = [
+            { id: 'combo_honey_bread', name: 'ハチミツパンの香り', pair: ['bakery', 'flower'], icons: '🥐＋🌷', bonusCoin: 9, bonusHappy: 7, desc: 'パン屋さんとお花畑が隣り合い、甘い香りが広がります！' },
+            { id: 'combo_lively_plaza', name: 'にぎわい噴水通り', pair: ['house', 'fountain'], icons: '🏡＋⛲', bonusCoin: 6, bonusHappy: 12, desc: 'おうちのそばに噴水があり、笑い声が絶えません。' },
+            { id: 'combo_flour_mill', name: 'ひきたて小麦の恵み', pair: ['windmill', 'bakery'], icons: '🎡＋🥐', bonusCoin: 15, bonusHappy: 6, desc: '風車で挽いた小麦で極上のパンが焼けます！' },
+            { id: 'combo_wisdom_square', name: '知恵と時の広場', pair: ['library', 'clocktower'], icons: '📚＋🕰️', bonusCoin: 11, bonusHappy: 14, desc: '時計塔の鐘を聞きながら読書を楽しむ知的な空間。' },
+            { id: 'combo_tea_party', name: 'おとぎの森のお茶会', pair: ['sweets', 'flower'], icons: '🧁＋🌷', bonusCoin: 13, bonusHappy: 18, desc: 'お花畑に囲まれたお菓子の家で素敵なお茶会！' },
+            { id: 'combo_story_cafe', name: '絵本カフェのひととき', pair: ['library', 'sweets'], icons: '📚＋🧁', bonusCoin: 16, bonusHappy: 17, desc: '甘いお菓子を味わいながら絵本を読める夢のブックカフェ！' }
+        ];
+
+        /* ==========================================================================
+           住民・おねがいごと定義
+           ========================================================================== */
+        const RESIDENTS_MASTER = [
+            { id: 'res_child', name: '冒険すきの子ども・ルナ', icon: '👧', role: '見習い冒険者', unlockStory: 0, questTitle: '三角屋根のおうちを建てよう！', questDesc: '「この草原に小さなおうちを建ててほしいな！」', check: (st) => countBuilding(st, 'house') >= 1, rewardCoins: 50, sticker: { id: 'stk_child', name: 'はじまりの靴シール', icon: '👞✨', buffText: '収穫量 +15%', coinMult: 0.15, happyFlat: 0 } },
+            { id: 'res_wizard', name: '見習い魔法使い・セシル', icon: '🧙‍♂️', role: '魔法使い', unlockStory: 15, questTitle: '森の絵本図書館を建てよう！', questDesc: '「新しい魔法の呪文を調べたいんだ。図書館を建ててよ！」', check: (st) => countBuilding(st, 'library') >= 1, rewardCoins: 75, sticker: { id: 'stk_wand', name: '星屑のステッキシール', icon: '🪄🌟', buffText: 'ハッピー度 +12', coinMult: 0, happyFlat: 12 } },
+            { id: 'res_knight', name: '勇敢な白銀の騎士・アルト', icon: '🛡️', role: '王国騎士', unlockStory: 35, questTitle: 'おとぎ話コンボを起こそう！', questDesc: '「パン屋さんとお花畑を隣り合わせにして、美味しい香りを漂わせてくれ！」', check: (st) => st.activeCombos.includes('combo_honey_bread'), rewardCoins: 95, sticker: { id: 'stk_shield', name: '守りの紋章シール', icon: '🛡️✨', buffText: '収穫量 +20%', coinMult: 0.20, happyFlat: 0 } },
+            { id: 'res_bard', name: '旅の吟遊詩人・レイラ', icon: '🪕', role: '詩人', unlockStory: 70, questTitle: '星見の時計塔を建てよう！', questDesc: '「時計塔の鐘の音に合わせて新しい歌を歌いたいんだ♪」', check: (st) => countBuilding(st, 'clocktower') >= 1, rewardCoins: 130, sticker: { id: 'stk_harp', name: '銀のハープシール', icon: '🪕🎶', buffText: 'ハッピー度 +22', coinMult: 0, happyFlat: 22 } },
+            { id: 'res_princess', name: '絵本の国の王女・ソフィア', icon: '👑', role: '王女さま', unlockStory: 110, questTitle: 'お菓子の夢ハウスを建てよう！', questDesc: '「甘いお菓子の家でお茶会を開きたいわ！建ててくださる？」', check: (st) => countBuilding(st, 'sweets') >= 1, rewardCoins: 180, sticker: { id: 'stk_crown', name: '絵本王国の王冠シール', icon: '👑🌈', buffText: '収穫 +25% ＆ ハッピー +25', coinMult: 0.25, happyFlat: 25 } }
+        ];
+
+        /* ==========================================================================
+           ゲーム状態
+           ========================================================================== */
+        const GRID_SIZE = 5; // 5×5グリッド
+        let state = {
+            coins: 150,
+            pendingCoins: 0,
+            happy: 12,
+            story: 0,
+            timeIndex: 0, // 0: day, 1: sunset, 2: night
+            selectedTool: 'inspect',
+            selectedCell: null,
+            grid: Array(GRID_SIZE * GRID_SIZE).fill(null), // { type, level }
+            activeCombos: [],
+            unlockedResidents: ['res_child'],
+            completedQuests: [],
+            earnedStickers: []
+        };
+
+        const TIME_MODES = [
+            { id: 'day', icon: '☀️', label: 'おひる', bg: 0xe4f2f8, ambient: 0xffffff, dir: 0xfff9e6, hemi: 0xddeef8 },
+            { id: 'sunset', icon: '🌇', label: 'ゆうやけ', bg: 0xf6d5b8, ambient: 0xffecd0, dir: 0xff9e64, hemi: 0xe8c4a0 },
+            { id: 'night', icon: '🌙', label: 'ほしぞら', bg: 0x3b496b, ambient: 0xa4c2f4, dir: 0x8ab4f8, hemi: 0x2b3856 }
+        ];
+
+        function countBuilding(st, bType) {
+            return st.grid.filter(c => c && c.type === bType).length;
+        }
+
+        /* ==========================================================================
+           Three.js 3Dジオラマシーン構築
+           ========================================================================== */
+        let scene, camera, renderer;
+        let cellMeshes = [];
+        let buildingMeshes = {};
+        let residentMeshes = [];
+        let raycaster, mouse;
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let cameraAngleTheta = Math.PI / 4;
+        let cameraAnglePhi = Math.PI / 3.2;
+        let cameraRadius = 14;
+        let dirLight, hemiLight, ambientLight;
+
+        function initThree() {
+            const container = document.getElementById('canvasContainer');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(TIME_MODES[0].bg);
+
+            camera = new THREE.PerspectiveCamera(42, container.clientWidth / container.clientHeight, 0.1, 1000);
+            updateCameraPosition();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // ライティング
+            ambientLight = new THREE.AmbientLight(TIME_MODES[0].ambient, 0.6);
+            scene.add(ambientLight);
+
+            hemiLight = new THREE.HemisphereLight(TIME_MODES[0].hemi, 0x554433, 0.5);
+            scene.add(hemiLight);
+
+            dirLight = new THREE.DirectionalLight(TIME_MODES[0].dir, 0.9);
+            dirLight.position.set(10, 18, 12);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 35;
+            const d = 8;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            scene.add(dirLight);
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // イベントリスナー（回転・クリック）
+            container.addEventListener('mousedown', onPointerDown);
+            container.addEventListener('mousemove', onPointerMove);
+            container.addEventListener('mouseup', onPointerUp);
+            container.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    onPointerDown({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
+                }
+            });
+            container.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 1) {
+                    onPointerMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
+                }
+            });
+            container.addEventListener('touchend', onPointerUp);
+            container.addEventListener('click', onCanvasClick);
+
+            window.addEventListener('resize', onWindowResize);
+
+            createBookBasePlate();
+            createGridCells();
+            spawnResidents3D();
+
+            // アニメーションループ
+            animate();
+        }
+
+        function updateCameraPosition() {
+            camera.position.x = cameraRadius * Math.sin(cameraAnglePhi) * Math.sin(cameraAngleTheta);
+            camera.position.y = cameraRadius * Math.cos(cameraAnglePhi);
+            camera.position.z = cameraRadius * Math.sin(cameraAnglePhi) * Math.cos(cameraAngleTheta);
+            camera.lookAt(0, 0, 0);
+        }
+
+        function onPointerDown(e) {
+            isDragging = true;
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        }
+
+        function onPointerMove(e) {
+            if (!isDragging) return;
+            const deltaX = e.clientX - previousMousePosition.x;
+            const deltaY = e.clientY - previousMousePosition.y;
+
+            cameraAngleTheta -= deltaX * 0.008;
+            cameraAnglePhi = Math.max(0.3, Math.min(Math.PI / 2 - 0.05, cameraAnglePhi - deltaY * 0.008));
+            updateCameraPosition();
+
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        }
+
+        function onPointerUp() {
+            isDragging = false;
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvasContainer');
+            if (!container) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        /* ==========================================================================
+           絵本の見開きベース＆グリッドマス作成
+           ========================================================================== */
+        function createBookBasePlate() {
+            // 見開きの紙ベース
+            const plateGeo = new THREE.BoxGeometry(7.2, 0.2, 7.2);
+            const plateMat = new THREE.MeshStandardMaterial({ color: 0xfbf4e2, roughness: 0.9, metalness: 0.05 });
+            const plate = new THREE.Mesh(plateGeo, plateMat);
+            plate.position.y = -0.12;
+            plate.receiveShadow = true;
+            scene.add(plate);
+
+            // 中央の製本ステッチ線
+            const stitchGeo = new THREE.BoxGeometry(0.06, 0.24, 7.2);
+            const stitchMat = new THREE.MeshStandardMaterial({ color: 0xbca888 });
+            const stitch = new THREE.Mesh(stitchGeo, stitchMat);
+            stitch.position.y = -0.01;
+            scene.add(stitch);
+        }
+
+        function createGridCells() {
+            cellMeshes.forEach(m => scene.remove(m));
+            cellMeshes = [];
+
+            const cellSize = 1.25;
+            const startX = -((GRID_SIZE - 1) * cellSize) / 2;
+            const startZ = -((GRID_SIZE - 1) * cellSize) / 2;
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const idx = r * GRID_SIZE + c;
+                    const cellGeo = new THREE.PlaneGeometry(cellSize - 0.08, cellSize - 0.08);
+                    const cellMat = new THREE.MeshStandardMaterial({
+                        color: 0xe6dbc2,
+                        roughness: 0.85,
+                        side: THREE.DoubleSide
+                    });
+                    const mesh = new THREE.Mesh(cellGeo, cellMat);
+                    mesh.rotation.x = -Math.PI / 2;
+                    mesh.position.set(startX + c * cellSize, 0.005, startZ + r * cellSize);
+                    mesh.receiveShadow = true;
+                    mesh.userData = { gridIndex: idx };
+                    scene.add(mesh);
+                    cellMeshes.push(mesh);
+                }
+            }
+        }
+
+        /* ==========================================================================
+           3Dペーパークラフト建築物のプロシージャル生成
+           ========================================================================== */
+        function getCellPosition(idx) {
+            const cellSize = 1.25;
+            const startX = -((GRID_SIZE - 1) * cellSize) / 2;
+            const startZ = -((GRID_SIZE - 1) * cellSize) / 2;
+            const r = Math.floor(idx / GRID_SIZE);
+            const c = idx % GRID_SIZE;
+            return { x: startX + c * cellSize, z: startZ + r * cellSize };
+        }
+
+        function build3DBuilding(type, level) {
+            const group = new THREE.Group();
+            const scale = 0.85 + (level - 1) * 0.2;
+
+            const baseMat = new THREE.MeshStandardMaterial({ color: 0xfffaf0, roughness: 0.75 });
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0xdc6b58, roughness: 0.65 });
+            const accentMat = new THREE.MeshStandardMaterial({ color: 0x6d5c4c, roughness: 0.8 });
+
+            if (type === 'house') {
+                // おうち
+                const bodyGeo = new THREE.BoxGeometry(0.8 * scale, 0.7 * scale, 0.8 * scale);
+                const body = new THREE.Mesh(bodyGeo, baseMat);
+                body.position.y = 0.35 * scale;
+                body.castShadow = true;
+                group.add(body);
+
+                const roofGeo = new THREE.ConeGeometry(0.7 * scale, 0.6 * scale, 4);
+                const roof = new THREE.Mesh(roofGeo, roofMat);
+                roof.position.y = 0.95 * scale;
+                roof.rotation.y = Math.PI / 4;
+                roof.castShadow = true;
+                group.add(roof);
+            } else if (type === 'flower') {
+                // お花畑
+                const bedGeo = new THREE.BoxGeometry(0.9 * scale, 0.15, 0.9 * scale);
+                const bed = new THREE.Mesh(bedGeo, new THREE.MeshStandardMaterial({ color: 0x7ca968 }));
+                bed.position.y = 0.08;
+                bed.castShadow = true;
+                group.add(bed);
+
+                [[-0.25, 0.25], [0.25, -0.25], [0, 0], [-0.25, -0.25], [0.25, 0.25]].forEach(([fx, fz]) => {
+                    const fGeo = new THREE.SphereGeometry(0.14, 6, 6);
+                    const fMat = new THREE.MeshStandardMaterial({ color: Math.random() > 0.5 ? 0xe76f51 : 0xf4a261 });
+                    const flower = new THREE.Mesh(fGeo, fMat);
+                    flower.position.set(fx * scale, 0.22, fz * scale);
+                    flower.castShadow = true;
+                    group.add(flower);
+                });
+            } else if (type === 'bakery') {
+                // パン屋
+                const bodyGeo = new THREE.BoxGeometry(0.9 * scale, 0.75 * scale, 0.8 * scale);
+                const body = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({ color: 0xf4ebd0 }));
+                body.position.y = 0.375 * scale;
+                body.castShadow = true;
+                group.add(body);
+
+                const awningGeo = new THREE.BoxGeometry(0.95 * scale, 0.15, 0.4);
+                const awningMat = new THREE.MeshStandardMaterial({ color: 0xe07a5f });
+                const awning = new THREE.Mesh(awningGeo, awningMat);
+                awning.position.set(0, 0.5 * scale, 0.4 * scale);
+                awning.rotation.x = 0.3;
+                group.add(awning);
+            } else if (type === 'fountain') {
+                // 噴水
+                const poolGeo = new THREE.CylinderGeometry(0.55 * scale, 0.6 * scale, 0.2, 12);
+                const pool = new THREE.Mesh(poolGeo, new THREE.MeshStandardMaterial({ color: 0xd8cbb5 }));
+                pool.position.y = 0.1;
+                pool.castShadow = true;
+                group.add(pool);
+
+                const waterGeo = new THREE.CylinderGeometry(0.48 * scale, 0.48 * scale, 0.12, 12);
+                const water = new THREE.Mesh(waterGeo, new THREE.MeshStandardMaterial({ color: 0x457b9d, roughness: 0.2 }));
+                water.position.y = 0.14;
+                group.add(water);
+
+                const pillarGeo = new THREE.CylinderGeometry(0.12, 0.15, 0.7, 8);
+                const pillar = new THREE.Mesh(pillarGeo, accentMat);
+                pillar.position.y = 0.45;
+                group.add(pillar);
+            } else if (type === 'windmill') {
+                // 風車
+                const towerGeo = new THREE.CylinderGeometry(0.35, 0.5, 1.1 * scale, 6);
+                const tower = new THREE.Mesh(towerGeo, baseMat);
+                tower.position.y = 0.55 * scale;
+                tower.castShadow = true;
+                group.add(tower);
+
+                const bladesGroup = new THREE.Group();
+                bladesGroup.position.set(0, 0.85 * scale, 0.32);
+                for (let i = 0; i < 4; i++) {
+                    const bladeGeo = new THREE.BoxGeometry(0.12, 0.8, 0.04);
+                    const blade = new THREE.Mesh(bladeGeo, accentMat);
+                    blade.rotation.z = (Math.PI / 2) * i;
+                    blade.position.y = 0.35;
+                    bladesGroup.add(blade);
+                }
+                group.add(bladesGroup);
+            } else if (type === 'library') {
+                // 図書館
+                const bodyGeo = new THREE.BoxGeometry(0.95 * scale, 0.85 * scale, 0.85 * scale);
+                const body = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({ color: 0x3d5a80 }));
+                body.position.y = 0.425 * scale;
+                body.castShadow = true;
+                group.add(body);
+
+                const roofGeo = new THREE.BoxGeometry(1.05 * scale, 0.2, 0.95 * scale);
+                const roof = new THREE.Mesh(roofGeo, accentMat);
+                roof.position.y = 0.92 * scale;
+                roof.castShadow = true;
+                group.add(roof);
+            } else if (type === 'clocktower') {
+                // 時計塔
+                const towerGeo = new THREE.BoxGeometry(0.65, 1.4 * scale, 0.65);
+                const tower = new THREE.Mesh(towerGeo, baseMat);
+                tower.position.y = 0.7 * scale;
+                tower.castShadow = true;
+                group.add(tower);
+
+                const roofGeo = new THREE.ConeGeometry(0.5, 0.6, 4);
+                const roof = new THREE.Mesh(roofGeo, new THREE.MeshStandardMaterial({ color: 0x1d3557 }));
+                roof.position.y = 1.5 * scale;
+                roof.rotation.y = Math.PI / 4;
+                group.add(roof);
+            } else if (type === 'sweets') {
+                // お菓子の家
+                const bodyGeo = new THREE.BoxGeometry(0.9 * scale, 0.75 * scale, 0.9 * scale);
+                const body = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({ color: 0xfde2e4 }));
+                body.position.y = 0.375 * scale;
+                body.castShadow = true;
+                group.add(body);
+
+                const roofGeo = new THREE.ConeGeometry(0.75 * scale, 0.65 * scale, 4);
+                const roof = new THREE.Mesh(roofGeo, new THREE.MeshStandardMaterial({ color: 0xffb5a7 }));
+                roof.position.y = 1.0 * scale;
+                roof.rotation.y = Math.PI / 4;
+                group.add(roof);
+            }
+
+            // ポップアップアニメーション（スケール0からふんわり立ち上がる）
+            group.scale.set(0.01, 0.01, 0.01);
+            group.userData = { targetScale: 1.0, popProgress: 0 };
+            return group;
+        }
+
+        function updateBuildings3D() {
+            // 既存の建物メッシュを削除
+            Object.values(buildingMeshes).forEach(mesh => scene.remove(mesh));
+            buildingMeshes = {};
+
+            state.grid.forEach((cellData, idx) => {
+                if (!cellData) return;
+                const pos = getCellPosition(idx);
+                const mesh = build3DBuilding(cellData.type, cellData.level);
+                mesh.position.set(pos.x, 0, pos.z);
+                mesh.userData.gridIndex = idx;
+                scene.add(mesh);
+                buildingMeshes[idx] = mesh;
+            });
+        }
+
+        /* ==========================================================================
+           住人キャラクターの3Dモデル＆アニメーション
+           ========================================================================== */
+        function createCharacter3D(iconChar) {
+            const group = new THREE.Group();
+
+            // 体
+            const bodyGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.45, 8);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xf4a261, roughness: 0.7 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.22;
+            body.castShadow = true;
+            group.add(body);
+
+            // 頭（顔）
+            const headGeo = new THREE.SphereGeometry(0.22, 10, 10);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xffe5d9, roughness: 0.6 });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 0.58;
+            head.castShadow = true;
+            group.add(head);
+
+            group.scale.set(0.8, 0.8, 0.8);
+            return group;
+        }
+
+        function spawnResidents3D() {
+            residentMeshes.forEach(m => scene.remove(m));
+            residentMeshes = [];
+
+            state.unlockedResidents.forEach((resId, i) => {
+                const res = RESIDENTS_MASTER.find(r => r.id === resId);
+                const charGroup = createCharacter3D(res.icon);
+                const angle = (i / state.unlockedResidents.length) * Math.PI * 2;
+                const radius = 2.2;
+                charGroup.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+                charGroup.userData = { angle: angle, radius: radius, speed: 0.35 + i * 0.08 };
+                scene.add(charGroup);
+                residentMeshes.push(charGroup);
+            });
+        }
+
+        /* ==========================================================================
+           レイキャスト＆クリック操作（3Dオブジェクト選択）
+           ========================================================================== */
+        function onCanvasClick(e) {
+            const container = document.getElementById('canvasContainer');
+            const rect = container.getBoundingClientRect();
+            mouse.x = ((e.clientX - rect.left) / container.clientWidth) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / container.clientHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            // グリッド平面との交差判定
+            const intersects = raycaster.intersectObjects(cellMeshes);
+            if (intersects.length > 0) {
+                const clickedCell = intersects[0].object;
+                const idx = clickedCell.userData.gridIndex;
+                handleCellClick(idx);
+            }
+        }
+
+        /* ==========================================================================
+           ゲームロジック統合
+           ========================================================================== */
+        function initGame() {
+            // 初期配置
+            state.grid[12] = { type: 'house', level: 1 }; // 中央マス
+            state.grid[11] = { type: 'flower', level: 1 };
+
+            recalculateTown();
+            initThree();
+            updateBuildings3D();
+            renderBuildPalette();
+            renderRightSidebar();
+            updateHeaderStats();
+
+            setInterval(tickTownLoop, 3000);
+        }
+
+        function recalculateTown() {
+            let baseHappy = 8;
+            let baseStory = 0;
+            const foundComboSet = new Set();
+
+            state.grid.forEach((cell, idx) => {
+                if (!cell) return;
+                const b = BUILDINGS[cell.type];
+                const lvMult = 1 + (cell.level - 1) * 0.5;
+                baseHappy += Math.round(b.happy * lvMult);
+                baseStory += Math.round(b.story * lvMult);
+
+                // 隣接チェック
+                const r = Math.floor(idx / GRID_SIZE);
+                const c = idx % GRID_SIZE;
+                const neighbors = [];
+                if (r > 0) neighbors.push((r - 1) * GRID_SIZE + c);
+                if (r < GRID_SIZE - 1) neighbors.push((r + 1) * GRID_SIZE + c);
+                if (c > 0) neighbors.push(r * GRID_SIZE + (c - 1));
+                if (c < GRID_SIZE - 1) neighbors.push(r * GRID_SIZE + (c + 1));
+
+                neighbors.forEach(nIdx => {
+                    const nCell = state.grid[nIdx];
+                    if (!nCell) return;
+                    COMBOS.forEach(cb => {
+                        if ((cb.pair[0] === cell.type && cb.pair[1] === nCell.type) ||
+                            (cb.pair[1] === cell.type && cb.pair[0] === nCell.type)) {
+                            foundComboSet.add(cb.id);
+                        }
+                    });
+                });
+            });
+
+            state.activeCombos = Array.from(foundComboSet);
+            state.activeCombos.forEach(cid => {
+                const cb = COMBOS.find(c => c.id === cid);
+                if (cb) baseHappy += cb.bonusHappy;
+            });
+
+            state.earnedStickers.forEach(sid => {
+                const res = RESIDENTS_MASTER.find(r => r.sticker.id === sid);
+                if (res) baseHappy += res.sticker.happyFlat;
+            });
+
+            state.happy = baseHappy;
+            state.story = baseStory;
+
+            RESIDENTS_MASTER.forEach(res => {
+                if (!state.unlockedResidents.includes(res.id) && state.story >= res.unlockStory) {
+                    state.unlockedResidents.push(res.id);
+                    sfx.upgradeChime();
+                    setNews(`🎉 新しい住民「${res.name}」が絵本のまちに移住してきました！`);
+                    spawnResidents3D();
+                }
+            });
+        }
+
+        function calcCycleIncome() {
+            let total = 0;
+            state.grid.forEach(cell => {
+                if (!cell) return;
+                const b = BUILDINGS[cell.type];
+                const lvMult = 1 + (cell.level - 1) * 0.6;
+                total += Math.round(b.income * lvMult);
+            });
+            state.activeCombos.forEach(cid => {
+                const cb = COMBOS.find(c => c.id === cid);
+                if (cb) total += cb.bonusCoin;
+            });
+
+            let mult = 1.0;
+            state.earnedStickers.forEach(sid => {
+                const res = RESIDENTS_MASTER.find(r => r.sticker.id === sid);
+                if (res) mult += res.sticker.coinMult;
+            });
+
+            return Math.max(2, Math.round(total * mult));
+        }
+
+        function tickTownLoop() {
+            const income = calcCycleIncome();
+            state.pendingCoins += income;
+            document.getElementById('pendingIncomeText').textContent = state.pendingCoins;
+        }
+
+        function collectAllIncome() {
+            if (state.pendingCoins <= 0) {
+                sfx.tapSoft();
+                setNews('まだどんぐりが実っていません。');
+                return;
+            }
+            const gained = state.pendingCoins;
+            state.coins += gained;
+            state.pendingCoins = 0;
+            sfx.coinSparkle();
+            updateHeaderStats();
+            showFloatingToastText(`🪙 +${gained} 収穫！`, 'bg-[#f6d57e]');
+            setNews(`🪙 街から ${gained} どんぐりコインを収穫しました！`);
+        }
+
+        /* ==========================================================================
+           工作トレー＆選択操作
+           ========================================================================= */
+        function selectTool(toolId) {
+            sfx.tapSoft();
+            state.selectedTool = toolId;
+            ['inspect', 'demolish'].forEach(id => {
+                const btn = document.getElementById(`tool_${id}`);
+                if (btn) btn.classList.toggle('selected-tool', toolId === id);
+            });
+            Object.keys(BUILDINGS).forEach(bId => {
+                const btn = document.getElementById(`build_btn_${bId}`);
+                if (btn) btn.classList.toggle('selected-tool', toolId === bId);
+            });
+            updateInspectorForTool();
+        }
+
+        function renderBuildPalette() {
+            const pal = document.getElementById('buildPalette');
+            pal.innerHTML = '';
+            Object.values(BUILDINGS).forEach(b => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.id = `build_btn_${b.id}`;
+                btn.onclick = () => selectTool(b.id);
+                btn.className = 'paper-btn bg-[#fffdf7] p-1.5 flex flex-col items-center justify-center text-center';
+                btn.innerHTML = `
+                    <span class="text-xl sm:text-2xl leading-none mb-0.5">${b.icon}</span>
+                    <span class="text-[10px] font-bold leading-tight truncate w-full">${b.name}</span>
+                    <span class="text-[10px] text-[#9c6615] font-bold mt-0.5">🪙${b.cost}</span>
+                `;
+                pal.appendChild(btn);
+            });
+        }
+
+        function handleCellClick(idx) {
+            const tool = state.selectedTool;
+            const existing = state.grid[idx];
+            state.selectedCell = idx;
+
+            if (BUILDINGS[tool]) {
+                const b = BUILDINGS[tool];
+                if (existing) {
+                    sfx.removeSoft();
+                    setNews(`⚠️ すでに「${BUILDINGS[existing.type].name}」が建っています！`);
+                    inspectCell(idx);
+                    return;
+                }
+                if (state.coins < b.cost) {
+                    sfx.removeSoft();
+                    setNews(`🪙 どんぐりコインが足りません！（必要: ${b.cost}）`);
+                    return;
+                }
+                state.coins -= b.cost;
+                state.grid[idx] = { type: b.id, level: 1 };
+                sfx.buildPop();
+
+                const prevCombos = [...state.activeCombos];
+                recalculateTown();
+                updateBuildings3D();
+                updateHeaderStats();
+                renderRightSidebar();
+                inspectCell(idx);
+
+                const newly = state.activeCombos.filter(c => !prevCombos.includes(c));
+                if (newly.length > 0) {
+                    const cb = COMBOS.find(c => c.id === newly[0]);
+                    sfx.upgradeChime();
+                    showFloatingToastText(`✨コンボ「${cb.name}」！`, 'bg-[#f4a2a2]');
+                    setNews(`✨ おとぎ話コンボ『${cb.name}』が発動しました！`);
+                } else {
+                    showFloatingToastText(`${b.icon} 完成！`, 'bg-[#98d4bb]');
+                    setNews(`${b.icon} 「${b.name}」を建てました！`);
+                }
+                return;
+            }
+
+            if (tool === 'demolish') {
+                if (!existing) {
+                    sfx.tapSoft();
+                    return;
+                }
+                const b = BUILDINGS[existing.type];
+                const refund = Math.floor(b.cost * 0.5);
+                state.coins += refund;
+                state.grid[idx] = null;
+                sfx.removeSoft();
+                recalculateTown();
+                updateBuildings3D();
+                updateHeaderStats();
+                renderRightSidebar();
+                setNews(`🧹 「${b.name}」を片付けました（${refund}コイン返却）。`);
+                return;
+            }
+
+            sfx.tapSoft();
+            inspectCell(idx);
+        }
+
+        function upgradeBuilding(idx) {
+            const cell = state.grid[idx];
+            if (!cell || cell.level >= 3) return;
+            const b = BUILDINGS[cell.type];
+            const upCost = Math.round(b.cost * (cell.level === 1 ? 1.5 : 2.5));
+
+            if (state.coins < upCost) {
+                sfx.removeSoft();
+                setNews(`🪙 アップグレードには ${upCost} コインが必要です！`);
+                return;
+            }
+
+            state.coins -= upCost;
+            cell.level += 1;
+            sfx.upgradeChime();
+            recalculateTown();
+            updateBuildings3D();
+            updateHeaderStats();
+            renderRightSidebar();
+            inspectCell(idx);
+            setNews(`✨ 「${b.name}」が Lv.${cell.level} にアップグレードしました！`);
+        }
+
+        /* ==========================================================================
+           右サイドバー＆インスペクター
+           ========================================================================== */
+        function updateInspectorForTool() {
+            const badge = document.getElementById('inspectorBadge');
+            const box = document.getElementById('inspectorContent');
+            const tool = state.selectedTool;
+
+            if (BUILDINGS[tool]) {
+                const b = BUILDINGS[tool];
+                badge.textContent = '建築プレビュー';
+                box.innerHTML = `
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-2xl">${b.icon}</span>
+                        <div>
+                            <div class="font-bold text-sm">${b.name}</div>
+                            <div class="text-[11px] text-[#9c6615] font-bold">費用: 🪙${b.cost} ／ 収益: +${b.income}/期</div>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-[#5c4d41]">${b.desc}</p>
+                `;
+            } else if (tool === 'demolish') {
+                badge.textContent = '撤去モード';
+                box.innerHTML = `<p class="text-center text-[#b84a5a]">ジオラマ上の建物をタップすると片付けられます。<br>（費用の50%がコインで戻ります）</p>`;
+            } else {
+                badge.textContent = '探索モード';
+                box.innerHTML = `<p class="text-center text-[#7a6b5b]">ジオラマ上の建物をタップすると、<br>レベルアップ強化や詳細を確認できます。</p>`;
+            }
+        }
+
+        function inspectCell(idx) {
+            const cell = state.grid[idx];
+            const badge = document.getElementById('inspectorBadge');
+            const box = document.getElementById('inspectorContent');
+
+            if (!cell) {
+                badge.textContent = '草原の空き地';
+                box.innerHTML = `<p class="text-center text-[#7a6b5b]">やわらかな草花が広がる空き地です。<br>工作トレーから建物を建てられます。</p>`;
+                return;
+            }
+
+            const b = BUILDINGS[cell.type];
+            const lvMult = 1 + (cell.level - 1) * 0.5;
+            const upCost = Math.round(b.cost * (cell.level === 1 ? 1.5 : 2.5));
+
+            badge.textContent = `Lv.${cell.level} 建築物`;
+            box.innerHTML = `
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">${b.icon}</span>
+                        <div>
+                            <div class="font-bold text-sm">${b.name} (Lv.${cell.level})</div>
+                            <div class="text-[10px] text-[#5c4d41]">🌟+${Math.round(b.happy * lvMult)} ／ 📚+${Math.round(b.story * lvMult)}</div>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-[11px] text-[#5c4d41] mb-1.5">${b.desc}</p>
+                ${cell.level < 3
+                    ? `<button onclick="upgradeBuilding(${idx})" class="paper-btn bg-[#f6d57e] w-full py-1 text-xs font-bold">⬆️ Lv.${cell.level + 1} へ強化 (🪙${upCost})</button>`
+                    : `<div class="text-center text-[10px] font-bold text-[#467d5e] bg-[#eef7f1] py-1 rounded">👑 最高レベル到達</div>`
+                }
+            `;
+        }
+
+        function renderRightSidebar() {
+            const questArea = document.getElementById('questListArea');
+            questArea.innerHTML = '';
+            document.getElementById('residentCountBadge').textContent = `住民 ${state.unlockedResidents.length}/${RESIDENTS_MASTER.length}人`;
+
+            let hasClaimable = false;
+            state.unlockedResidents.forEach(resId => {
+                const res = RESIDENTS_MASTER.find(r => r.id === resId);
+                const isDone = state.completedQuests.includes(resId);
+                const canClaim = !isDone && res.check(state);
+                if (canClaim) hasClaimable = true;
+
+                const card = document.createElement('div');
+                card.className = `p-2.5 rounded-xl border ${canClaim ? 'border-2 border-[#e07a5f] bg-[#fff5e4]' : 'border-[#d4c3a6] bg-[#fffdf7]'}`;
+                card.innerHTML = `
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-bold text-xs flex items-center gap-1"><span>${res.icon}</span><span>${res.name}</span></span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full ${isDone ? 'bg-[#98d4bb] font-bold' : (canClaim ? 'bg-[#f4a2a2] font-bold animate-pulse' : 'bg-[#efe4ce]')}">
+                            ${isDone ? '達成済' : (canClaim ? '達成！' : '進行中')}
+                        </span>
+                    </div>
+                    <div class="text-[11px] font-bold text-[#473b2f] mb-0.5">${res.questTitle}</div>
+                    <p class="text-[10px] text-[#6d5c4c] mb-1.5">${res.questDesc}</p>
+                    ${canClaim ? `<button onclick="claimQuest('${resId}')" class="paper-btn bg-[#f6d57e] w-full py-1 text-xs font-bold">🎁 ほうび＆シールを受け取る！</button>` : ''}
+                `;
+                questArea.appendChild(card);
+            });
+
+            document.getElementById('questAlertDot').classList.toggle('hidden', !hasClaimable);
+
+            const comboBar = document.getElementById('activeCombosBar');
+            document.getElementById('comboCountText').textContent = `${state.activeCombos.length}/${COMBOS.length}個発動中`;
+            if (state.activeCombos.length === 0) {
+                comboBar.innerHTML = `<span class="text-[11px] text-[#8c7a6b]">建物を隣り合わせに並べるとコンボが生まれます！</span>`;
+            } else {
+                comboBar.innerHTML = '';
+                state.activeCombos.forEach(cid => {
+                    const cb = COMBOS.find(c => c.id === cid);
+                    const pill = document.createElement('span');
+                    pill.className = 'px-2 py-0.5 text-[10px] font-bold rounded-full bg-[#ffeff0] border border-[#d98a94] text-[#8f3844]';
+                    pill.textContent = `${cb.icons} ${cb.name}`;
+                    comboBar.appendChild(pill);
+                });
+            }
+        }
+
+        function claimQuest(resId) {
+            const res = RESIDENTS_MASTER.find(r => r.id === resId);
+            if (!res || state.completedQuests.includes(resId)) return;
+
+            state.completedQuests.push(resId);
+            state.coins += res.rewardCoins;
+            if (!state.earnedStickers.includes(res.sticker.id)) state.earnedStickers.push(res.sticker.id);
+
+            sfx.questComplete();
+            recalculateTown();
+            updateHeaderStats();
+            renderRightSidebar();
+            setNews(`🎊 ${res.name}のおねがい達成！記念シールを手に入れました！`);
+        }
+
+        /* ==========================================================================
+           時間帯切り替え＆アニメーションループ
+           ========================================================================== */
+        function cycleTimeOfDay() {
+            sfx.tapSoft();
+            state.timeIndex = (state.timeIndex + 1) % TIME_MODES.length;
+            const current = TIME_MODES[state.timeIndex];
+
+            document.getElementById('timeIcon').textContent = current.icon;
+            document.getElementById('timeLabel').textContent = current.label;
+
+            scene.background.setHex(current.bg);
+            ambientLight.color.setHex(current.ambient);
+            dirLight.color.setHex(current.dir);
+            hemiLight.color.setHex(current.hemi);
+        }
+
+        function updateHeaderStats() {
+            document.getElementById('statCoins').textContent = state.coins;
+            document.getElementById('statHappy').textContent = state.happy;
+            document.getElementById('statStory').textContent = state.story;
+            document.getElementById('pendingIncomeText').textContent = state.pendingCoins;
+
+            let rankText = 'Lv.1 はじまりのジオラマ';
+            if (state.story >= 120) rankText = 'Lv.5 伝説の絵本王国';
+            else if (state.story >= 80) rankText = 'Lv.4 星降るメルヘンタウン';
+            else if (state.story >= 45) rankText = 'Lv.3 にぎわいポップアップ村';
+            else if (state.story >= 20) rankText = 'Lv.2 そよ風の小さな里';
+            document.getElementById('townRankBadge').textContent = rankText;
+        }
+
+        function setNews(msg) {
+            document.getElementById('newsTicker').textContent = msg;
+        }
+
+        function showFloatingToastText(text, bgClass) {
+            const container = document.getElementById('canvasContainer');
+            const toast = document.createElement('div');
+            toast.className = `floating-toast ${bgClass} px-3 py-1 rounded-full border border-[#6d5c4c] text-xs font-bold shadow`;
+            toast.style.left = '50%';
+            toast.style.top = '40%';
+            toast.style.transform = 'translate(-50%, -50%)';
+            toast.textContent = text;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 1350);
+        }
+
+        /* ==========================================================================
+           アニメーションループ（3Dポップアップ＆住民キャラクターの歩行）
+           ========================================================================== */
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 建築物のポップアップ上昇アニメーション
+            Object.values(buildingMeshes).forEach(mesh => {
+                if (mesh.userData.targetScale && mesh.scale.x < mesh.userData.targetScale) {
+                    mesh.scale.x += (mesh.userData.targetScale - mesh.scale.x) * 0.12;
+                    mesh.scale.y += (mesh.userData.targetScale - mesh.scale.y) * 0.12;
+                    mesh.scale.z += (mesh.userData.targetScale - mesh.scale.z) * 0.12;
+                }
+            });
+
+            // 住民キャラクターの周回歩行アニメーション
+            const time = Date.now() * 0.001;
+            residentMeshes.forEach(char => {
+                char.userData.angle += char.userData.speed * 0.015;
+                const r = char.userData.radius;
+                char.position.x = Math.cos(char.userData.angle) * r;
+                char.position.z = Math.sin(char.userData.angle) * r;
+                char.rotation.y = -char.userData.angle + Math.PI / 2;
+                // トコトコ上下揺れ
+                char.position.y = Math.abs(Math.sin(time * 6 + char.userData.angle * 3)) * 0.12;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        /* ==========================================================================
+           しおり図鑑モーダル
+           ========================================================================== */
+        function openBookmarkModal(tab = 'residents') {
+            sfx.tapSoft();
+            document.getElementById('bookmarkModal').classList.remove('hidden');
+            switchBookmarkTab(tab);
+        }
+
+        function closeBookmarkModal() {
+            sfx.tapSoft();
+            document.getElementById('bookmarkModal').classList.add('hidden');
+        }
+
+        function switchBookmarkTab(tab) {
+            ['residents', 'combos', 'stickers'].forEach(t => {
+                const btn = document.getElementById(`tab_${t}`);
+                btn.classList.toggle('bg-[#f6d57e]', t === tab);
+                btn.classList.toggle('bg-[#f5efe2]', t !== tab);
+            });
+
+            const area = document.getElementById('bookmarkContentArea');
+            area.innerHTML = '';
+
+            if (tab === 'residents') {
+                RESIDENTS_MASTER.forEach(res => {
+                    const unlocked = state.unlockedResidents.includes(res.id);
+                    const done = state.completedQuests.includes(res.id);
+                    const card = document.createElement('div');
+                    card.className = `p-3 rounded-xl border-2 ${unlocked ? 'border-[#6d5c4c] bg-[#fffaf0]' : 'border-dashed border-[#bfa98e] bg-[#f3ead8]/60'}`;
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                                <span class="text-xl">${unlocked ? res.icon : '❓'}</span>
+                                <span>${unlocked ? res.name : `未移住の住民（ものがたり度 ${res.unlockStory} で登場）`}</span>
+                            </span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full ${done ? 'bg-[#98d4bb] font-bold' : 'bg-[#e6dac3]'}">
+                                ${done ? 'おねがい達成' : (unlocked ? '移住済み' : '未登場')}
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-[#5c4d41]">${unlocked ? `おねがい：${res.questTitle}（報酬シール：${res.sticker.name}）` : '街を発展させるとお引越ししてきます。'}</p>
+                    `;
+                    area.appendChild(card);
+                });
+            } else if (tab === 'combos') {
+                COMBOS.forEach(cb => {
+                    const active = state.activeCombos.includes(cb.id);
+                    const card = document.createElement('div');
+                    card.className = `p-3 rounded-xl border-2 ${active ? 'border-[#d98a94] bg-[#fff5f6]' : 'border-[#d4c3a6] bg-[#fffdf7]'}`;
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="font-bold text-xs sm:text-sm">${cb.icons} ${cb.name}</span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full ${active ? 'bg-[#f4a2a2] font-bold' : 'bg-[#efe4ce]'}">${active ? '✨ 発動中！' : '未発動'}</span>
+                        </div>
+                        <p class="text-[11px] text-[#5c4d41] mb-1">${cb.desc}</p>
+                        <div class="text-[10px] font-bold text-[#9c6615]">効果：🪙+${cb.bonusCoin}/期 ／ 🌟+${cb.bonusHappy}</div>
+                    `;
+                    area.appendChild(card);
+                });
+            } else if (tab === 'stickers') {
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-2 sm:grid-cols-3 gap-2.5';
+                RESIDENTS_MASTER.forEach(res => {
+                    const stk = res.sticker;
+                    const owned = state.earnedStickers.includes(stk.id);
+                    const item = document.createElement('div');
+                    item.className = `p-3 rounded-2xl text-center flex flex-col items-center justify-center ${owned ? 'medal-sticker' : 'border-2 border-dashed border-[#bfa98e] bg-[#f3ead8]/50 opacity-65'}`;
+                    item.innerHTML = `
+                        <span class="text-3xl mb-1">${owned ? stk.icon : '🔒'}</span>
+                        <div class="font-bold text-xs mb-0.5">${owned ? stk.name : 'ひみつのシール'}</div>
+                        <div class="text-[10px] text-[#5c4d41]">${owned ? stk.buffText : `${res.icon} のクエスト報酬`}</div>
+                    `;
+                    grid.appendChild(item);
+                });
+                area.appendChild(grid);
+            }
+        }
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
