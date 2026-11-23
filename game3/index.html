@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>深海・怪異の釣堀</title>
+  <style>
+    :root {
+      --bg-deep: #04070c;
+      --border-dim: rgba(150, 185, 205, 0.22);
+      --text-main: #e2ecf2;
+      --text-sub: #8698a6;
+      --accent-blood: #9e2a2b;
+      --accent-glow: #4ea8de;
+      --rare-common: #8d99ae;
+      --rare-rare: #48cae4;
+      --rare-epic: #c77dff;
+      --rare-legend: #ff4d6d;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-deep);
+      color: var(--text-main);
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #app {
+      position: relative;
+      width: 100%;
+      max-width: 480px;
+      height: 100%;
+      max-height: 920px;
+      display: flex;
+      flex-direction: column;
+      background: radial-gradient(circle at 50% 20%, #122132 0%, #05080d 78%);
+      box-shadow: 0 0 65px rgba(0, 0, 0, 0.96);
+      overflow: hidden;
+    }
+
+    /* 画面揺れ・恐怖フラッシュ演出 */
+    .shake-light {
+      animation: shakeLight 0.28s ease-in-out;
+    }
+    .shake-heavy {
+      animation: shakeHeavy 0.58s cubic-bezier(.36,.07,.19,.97) both;
+    }
+    .horror-flash {
+      animation: horrorFlash 0.7s ease-out;
+    }
+
+    @keyframes shakeLight {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-3px, 2px); }
+      50% { transform: translate(3px, -2px); }
+      75% { transform: translate(-2px, -1px); }
+    }
+    @keyframes shakeHeavy {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      15% { transform: translate(-8px, 5px) rotate(-1deg); }
+      30% { transform: translate(8px, -6px) rotate(1deg); }
+      45% { transform: translate(-7px, -4px) rotate(-0.8deg); }
+      60% { transform: translate(6px, 4px) rotate(0.8deg); }
+      75% { transform: translate(-4px, 2px) rotate(-0.4deg); }
+    }
+    @keyframes horrorFlash {
+      0% { filter: contrast(1.85) brightness(0.38) saturate(2.3) hue-rotate(-14deg); }
+      28% { filter: contrast(2.25) brightness(1.32) saturate(2.6) hue-rotate(-24deg); }
+      100% { filter: contrast(1) brightness(1) saturate(1) hue-rotate(0deg); }
+    }
+
+    /* 上部ヘッダー */
+    header {
+      position: relative;
+      z-index: 10;
+      padding: 10px 12px 8px;
+      background: linear-gradient(to bottom, rgba(4, 7, 12, 0.96), rgba(6, 10, 17, 0.72));
+      border-bottom: 1px solid var(--border-dim);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .game-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: #f0f6fa;
+      text-shadow: 0 0 14px rgba(78, 168, 222, 0.35);
+    }
+
+    .collection-badge {
+      font-size: 0.78rem;
+      color: var(--rare-rare);
+      background: rgba(72, 202, 228, 0.1);
+      border: 1px solid rgba(72, 202, 228, 0.35);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-family: sans-serif;
+      font-weight: 600;
+    }
+
+    .icon-btn {
+      background: rgba(18, 27, 40, 0.85);
+      border: 1px solid var(--border-dim);
+      color: var(--text-main);
+      border-radius: 8px;
+      padding: 5px 9px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .icon-btn:active {
+      background: rgba(50, 70, 95, 0.9);
+    }
+
+    /* エサ選択バー */
+    .bait-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .bait-btn {
+      position: relative;
+      background: rgba(12, 19, 30, 0.88);
+      border: 1px solid var(--border-dim);
+      border-radius: 8px;
+      padding: 6px 6px;
+      color: var(--text-sub);
+      font-size: 0.72rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      line-height: 1.25;
+    }
+
+    .bait-btn.active {
+      color: #fff;
+      border-color: var(--accent-glow);
+      background: linear-gradient(145deg, rgba(28, 52, 74, 0.92), rgba(13, 22, 35, 0.96));
+      box-shadow: 0 0 12px rgba(78, 168, 222, 0.25);
+    }
+
+    .bait-btn.locked {
+      opacity: 0.5;
+      border-style: dashed;
+    }
+
+    .bait-name {
+      display: block;
+      font-weight: 700;
+      font-size: 0.76rem;
+      margin-bottom: 2px;
+    }
+
+    .bait-sub {
+      display: block;
+      font-size: 0.64rem;
+      opacity: 0.85;
+      font-family: sans-serif;
+    }
+
+    /* メイン釣堀キャンバス領域 */
+    #stage-wrap {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    #pond-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 状態メッセージ＆ヒット警告 */
+    #status-overlay {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      text-align: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(5, 9, 15, 0.82);
+      border: 1px solid rgba(185, 215, 235, 0.22);
+      font-size: 0.84rem;
+      letter-spacing: 0.06em;
+      color: #eaf2f7;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.7);
+      transition: all 0.18s ease;
+    }
+
+    .status-pill.hit-alert {
+      background: rgba(158, 42, 43, 0.94);
+      border-color: #ff8fa3;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.02rem;
+      transform: scale(1.06);
+      box-shadow: 0 0 24px rgba(255, 77, 109, 0.78);
+    }
+
+    .omen-text {
+      margin-top: 6px;
+      font-size: 0.74rem;
+      color: #ff9ebb;
+      text-shadow: 0 0 8px rgba(255, 77, 109, 0.65);
+      min-height: 1.1em;
+    }
+
+    /* 下部アクションバー */
+    footer {
+      position: relative;
+      z-index: 10;
+      padding: 10px 14px 14px;
+      background: linear-gradient(to top, rgba(4, 7, 12, 0.98), rgba(7, 11, 19, 0.88));
+      border-top: 1px solid var(--border-dim);
+      display: flex;
+      gap: 10px;
+    }
+
+    .main-action-btn {
+      flex: 1.4;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(120, 185, 225, 0.45);
+      background: linear-gradient(180deg, #1b3248 0%, #0d1926 100%);
+      color: #f0f6fa;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      transition: transform 0.1s, filter 0.2s;
+    }
+    .main-action-btn:active {
+      transform: scale(0.98);
+      filter: brightness(1.15);
+    }
+    .main-action-btn.pulling {
+      background: linear-gradient(180deg, #8b1e24 0%, #4d0d12 100%);
+      border-color: #ff758f;
+      box-shadow: 0 0 22px rgba(255, 77, 109, 0.55);
+    }
+
+    .zukan-btn {
+      flex: 1;
+      padding: 12px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border-dim);
+      background: rgba(17, 25, 37, 0.92);
+      color: var(--text-main);
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .zukan-btn:active {
+      background: rgba(34, 48, 68, 0.95);
+    }
+
+    /* モーダル共通 */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 4, 8, 0.86);
+      backdrop-filter: blur(6px);
+      z-index: 50;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+    }
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 440px;
+      max-height: 88vh;
+      background: linear-gradient(165deg, #131c29 0%, #070b11 100%);
+      border: 1px solid rgba(165, 200, 220, 0.28);
+      border-radius: 14px;
+      box-shadow: 0 20px 55px rgba(0, 0, 0, 0.94);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 0.96rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .close-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: var(--text-main);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .modal-body {
+      padding: 16px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* 釣果発表カード */
+    .catch-art-frame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: #030508;
+      margin-bottom: 12px;
+      box-shadow: inset 0 0 42px rgba(0, 0, 0, 0.95), 0 8px 24px rgba(0, 0, 0, 0.7);
+    }
+
+    .catch-art-frame canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .rarity-tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-family: sans-serif;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      letter-spacing: 0.05em;
+    }
+    .rarity-common { background: rgba(141, 153, 174, 0.2); color: #cbd5e1; border: 1px solid rgba(141, 153, 174, 0.4); }
+    .rarity-rare { background: rgba(72, 202, 228, 0.18); color: #72efdd; border: 1px solid rgba(72, 202, 228, 0.45); }
+    .rarity-epic { background: rgba(199, 125, 255, 0.2); color: #e0aaff; border: 1px solid rgba(199, 125, 255, 0.5); }
+    .rarity-legend { background: rgba(255, 77, 109, 0.24); color: #ff8fa3; border: 1px solid rgba(255, 77, 109, 0.6); }
+
+    .new-badge {
+      display: inline-block;
+      margin-left: 6px;
+      font-size: 0.68rem;
+      font-family: sans-serif;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #e63946;
+      color: #fff;
+      vertical-align: middle;
+    }
+
+    .catch-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 0 0 8px;
+      color: #f8fafc;
+      line-height: 1.35;
+    }
+
+    .catch-desc {
+      font-size: 0.86rem;
+      line-height: 1.65;
+      color: #cad6e0;
+      background: rgba(0, 0, 0, 0.42);
+      border-left: 2px solid rgba(180, 205, 225, 0.38);
+      padding: 10px 12px;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 14px;
+    }
+
+    .catch-meta {
+      font-size: 0.74rem;
+      color: var(--text-sub);
+      font-family: sans-serif;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .modal-footer-btn {
+      width: 100%;
+      padding: 11px;
+      border-radius: 9px;
+      border: 1px solid rgba(140, 190, 220, 0.4);
+      background: linear-gradient(180deg, #1d354d 0%, #0e1926 100%);
+      color: #fff;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* 図鑑グリッド */
+    .zukan-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .zukan-item {
+      background: rgba(10, 16, 25, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 7px 6px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .zukan-item:active {
+      transform: scale(0.97);
+    }
+    .zukan-item.unlocked {
+      border-color: rgba(140, 195, 225, 0.35);
+    }
+    .zukan-item.locked {
+      opacity: 0.55;
+    }
+
+    .zukan-thumb {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      border-radius: 5px;
+      overflow: hidden;
+      background: #030508;
+      margin-bottom: 5px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .zukan-thumb canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .zukan-num {
+      font-size: 0.62rem;
+      color: var(--text-sub);
+      font-family: sans-serif;
+    }
+    .zukan-name {
+      font-size: 0.7rem;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="top-bar">
+        <div class="title-group">
+          <span class="game-title">深海・怪異の釣堀</span>
+          <span id="collection-badge" class="collection-badge">0 / 30 種</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button id="sound-btn" class="icon-btn" title="音切替">🔊 音ON</button>
+          <button id="reset-btn" class="icon-btn" title="データ初期化">↺</button>
+        </div>
+      </div>
+
+      <div class="bait-bar">
+        <button class="bait-btn active" data-bait="worm">
+          <span class="bait-name">🪱 普通のミミズ</span>
+          <span class="bait-sub">初期解放・基本</span>
+        </button>
+        <button class="bait-btn locked" data-bait="plankton">
+          <span class="bait-name">✨ 光るプランクトン</span>
+          <span id="unlock-plankton" class="bait-sub">5種で解放</span>
+        </button>
+        <button class="bait-btn locked" data-bait="offering">
+          <span class="bait-name">🕯️ 禁断のお供え物</span>
+          <span id="unlock-offering" class="bait-sub">15種で解放</span>
+        </button>
+      </div>
+    </header>
+
+    <div id="stage-wrap">
+      <canvas id="pond-canvas"></canvas>
+      <div id="status-overlay">
+        <div id="status-pill" class="status-pill">水面をタップして糸を垂らそう</div>
+        <div id="omen-text" class="omen-text"></div>
+      </div>
+    </div>
+
+    <footer>
+      <button id="action-btn" class="main-action-btn">糸を垂らす</button>
+      <button id="zukan-btn" class="zukan-btn">📖 怪異図鑑</button>
+    </footer>
+  </div>
+
+  <!-- 釣果発表モーダル -->
+  <div id="catch-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title">引き上げられた怪異</span>
+        <button id="close-catch-btn" class="close-btn">閉じる</button>
+      </div>
+      <div class="modal-body">
+        <div class="catch-art-frame">
+          <canvas id="catch-canvas" width="440" height="330"></canvas>
+        </div>
+        <div>
+          <span id="catch-rarity" class="rarity-tag rarity-common">コモン</span>
+          <span id="catch-new-badge" class="new-badge" style="display:none;">NEW</span>
+        </div>
+        <h2 id="catch-name" class="catch-name">---</h2>
+        <div id="catch-desc" class="catch-desc">---</div>
+        <div class="catch-meta">
+          <span id="catch-count-stat">累計捕獲数: 1</span>
+          <span id="catch-total-stat">総釣果: 1回</span>
+        </div>
+        <button id="continue-btn" class="modal-footer-btn">次の釣りを始める</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 怪異図鑑モーダル -->
+  <div id="zukan-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span id="zukan-header-title" class="modal-title">怪異図鑑 (0 / 30)</span>
+        <button id="close-zukan-btn" class="close-btn">閉じる</button>
+      </div>
+      <div id="zukan-body" class="modal-body">
+        <div id="zukan-grid" class="zukan-grid"></div>
+        <div id="zukan-detail" style="display:none;">
+          <div class="catch-art-frame">
+            <canvas id="detail-canvas" width="440" height="330"></canvas>
+          </div>
+          <span id="detail-rarity" class="rarity-tag rarity-common">コモン</span>
+          <h2 id="detail-name" class="catch-name">---</h2>
+          <div id="detail-desc" class="catch-desc">---</div>
+          <div class="catch-meta">
+            <span id="detail-caught">捕獲数: 0</span>
+            <span id="detail-id">No.001</span>
+          </div>
+          <button id="back-to-grid-btn" class="modal-footer-btn">図鑑一覧に戻る</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const MONSTERS = [
+      { id: 1, name: "白濁した目の深海魚", rarity: "common", desc: "光の届かない底で暮らしていたはずだが、その白く濁った目は確かにこちらを捉えている。" },
+      { id: 2, name: "片方だけの子供用長靴", rarity: "common", desc: "泥と藻がこびりついた黄色い長靴。中にはまだ、冷たい海水と何か柔らかいものが詰まっている。" },
+      { id: 3, name: "フジツボまみれの懐中時計", rarity: "common", desc: "殻がびっしりと張り付き、蓋は開かない。耳を澄ますと、中から規則正しい秒針の音が聞こえる。" },
+      { id: 4, name: "黒く濁った空き瓶", rarity: "common", desc: "コルク栓が固く閉ざされたガラス瓶。底に沈殿している黒い砂のようなものは、時折わずかに蠢く。" },
+      { id: 5, name: "長い黒髪が絡みついた櫛", rarity: "common", desc: "古びた木製の櫛。どれだけ引き抜こうとしても、濡れた長い髪の毛が指に絡みついて離れない。" },
+      { id: 6, name: "錆びついた鳥籠", rarity: "common", desc: "扉が開いたままの小さな鉄の鳥籠。海藻が絡まっているが、中で何かが羽ばたいた気配が残っている。" },
+      { id: 7, name: "割れた磁器の人形の頭部", rarity: "common", desc: "左半分が欠けたビスクドールの頭。残った右のガラス玉の瞳は、釣り上げられた瞬間にゆっくりと上を向いた。" },
+      { id: 8, name: "名前の消えた木札", rarity: "common", desc: "何かの供養に使われたらしい木の札。墨で書かれた文字は海水で溶け、誰の名前だったのか判別できない。" },
+      { id: 9, name: "指の関節のようなサンゴ", rarity: "common", desc: "白く変色した枝サンゴ。よく見ると節の数が人間の指とまったく同じで、爪のような突起がある。" },
+      { id: 10, name: "穴の空いたブリキのバケツ", rarity: "common", desc: "底が錆びて抜け落ちたバケツ。内側に、小さな爪で引っ掻いたような無数の傷跡が刻まれている。" },
+      { id: 11, name: "濡れていない古新聞の切れ端", rarity: "common", desc: "数十年前の日付が記された紙片。海中にあったはずなのに、なぜかパリパリに乾いている。" },
+      { id: 12, name: "人面模様の貝殻", rarity: "common", desc: "苦悶に歪んだ人間の横顔のような凹凸がある二枚貝。殻の隙間から、赤い舌のような身が覗いている。" },
+
+      { id: 13, name: "文字が滲まない古い日記帳", rarity: "rare", desc: "革表紙の手帳。ページをめくると「今日も水面から誰かが覗いている」という同じ文面が最後まで続いている。" },
+      { id: 14, name: "海底遺跡の歪んだ歯車", rarity: "rare", desc: "現代の金属ではない、青黒く光る合金の歯車。単体なのに、時々「カチリ」と勝手に回転する。" },
+      { id: 15, name: "釘の刺さったわら人形", rarity: "rare", desc: "海水を吸ってずっしりと重い。胸のあたりに打ち込まれた五寸釘は、まだ赤く錆びたばかりのように生々しい。" },
+      { id: 16, name: "半分に割れた狐のお面", rarity: "rare", desc: "祭りで使われるような白い狐面。裏側には、びっしりと赤い文字で何かのお経のようなものが書かれている。" },
+      { id: 17, name: "誰かの結婚指輪", rarity: "rare", desc: "プラチナ製のシンプルな指輪。内側にイニシャルが彫られているが、指にはめると決して抜けなくなるという。" },
+      { id: 18, name: "中身入りの古いランドセル", rarity: "rare", desc: "革がひび割れた赤いランドセル。中には教科書ではなく、大量の濡れた砂と石ころだけが詰め込まれている。" },
+      { id: 19, name: "止まったままの防水カメラ", rarity: "rare", desc: "使い捨ての防水カメラ。残りのフィルム枚数は「0」で、最後の1枚には暗闇の中で光る無数の目が写っているはずだ。" },
+      { id: 20, name: "耳の形をした海綿", rarity: "rare", desc: "人間の左耳にそっくりな不気味な生物。近づくと、周囲の音を吸い込むように微かに震える。" },
+      { id: 21, name: "赤い糸が巻かれた小指の骨", rarity: "rare", desc: "白く漂白された小さな骨。誰かと固く結ばれていたのか、色褪せない赤い絹糸が何重にも巻き付いている。" },
+      { id: 22, name: "水底の郵便受け", rarity: "rare", desc: "錆びついた赤いポスト。中には宛名のない手紙が一通だけ入っており、差出人の欄にはあなたの名前が書かれている。" },
+
+      { id: 23, name: "まばたきをする巨大な目玉", rarity: "epic", desc: "ソフトボールほどの大きさがある生々しい眼球。神経の束を垂らしながら、ギョロリとこちらを見据えてゆっくり瞬きをした。" },
+      { id: 24, name: "封印の札が剥がれかけた小瓶", rarity: "epic", desc: "朱色の護符で厳重に封じられた壺。札の端がめくれており、隙間から冷たい吐息のようなものが漏れ出している。" },
+      { id: 25, name: "人魚（のような何か）のミイラ化した手", rarity: "epic", desc: "水かきと鋭い爪を持つ干からびた腕。指先が微かに痙攣し、水の中へ引きずり込もうとする力を感じる。" },
+      { id: 26, name: "深海の祭壇の鍵", rarity: "epic", desc: "骨を削り出して作られたような巨大な鍵。手にした瞬間、頭の奥で低い鐘の音が鳴り響く。" },
+      { id: 27, name: "水死体の影を宿したランタン", rarity: "epic", desc: "火が消えているのに、ガラスの奥で青白い人魂のような光が揺れている。照らされた自分の影が、自分とは違う動きをする。" },
+      { id: 28, name: "呼び声のする貝殻（法螺貝）", rarity: "epic", desc: "耳を当てると波の音ではなく、水底から助けを求める大勢のくぐもった声が聞こえてくる。" },
+
+      { id: 29, name: "こちらを覗き込む「水鏡」", rarity: "legend", desc: "枠のない円形の鏡。水面を映しているはずなのに、そこにはあなたの背後に立つ「見知らぬ誰か」の顔がはっきりと映っている。" },
+      { id: 30, name: "深淵の主（名状しがたきものの触腕）", rarity: "legend", desc: "釣り糸の先に絡みついてきた、漆黒の鱗と無数の吸盤を持つ巨大な何かの一部。水面の奥では、さらに巨大な「本体」がゆっくりと口を開けている。" }
+    ];
+
+    const RARITY_INFO = {
+      common: { label: "コモン", className: "rarity-common" },
+      rare: { label: "レア", className: "rarity-rare" },
+      epic: { label: "激レア", className: "rarity-epic" },
+      legend: 
