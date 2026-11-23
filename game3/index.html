@@ -29,6 +29,7 @@
       padding: 0;
       width: 100%;
       height: 100%;
+      min-height: 100dvh;
       background-color: var(--bg-deep);
       color: var(--text-main);
       font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
@@ -42,8 +43,9 @@
       position: relative;
       width: 100%;
       max-width: 480px;
-      height: 100%;
+      height: 100dvh;
       max-height: 920px;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       background: radial-gradient(circle at 50% 20%, #122132 0%, #05080d 78%);
@@ -51,7 +53,6 @@
       overflow: hidden;
     }
 
-    /* 画面揺れ・恐怖フラッシュ演出 */
     .shake-light {
       animation: shakeLight 0.28s ease-in-out;
     }
@@ -82,10 +83,10 @@
       100% { filter: contrast(1) brightness(1) saturate(1) hue-rotate(0deg); }
     }
 
-    /* 上部ヘッダー */
     header {
       position: relative;
       z-index: 10;
+      flex-shrink: 0;
       padding: 10px 12px 8px;
       background: linear-gradient(to bottom, rgba(4, 7, 12, 0.96), rgba(6, 10, 17, 0.72));
       border-bottom: 1px solid var(--border-dim);
@@ -142,7 +143,6 @@
       background: rgba(50, 70, 95, 0.9);
     }
 
-    /* エサ選択バー */
     .bait-bar {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -189,13 +189,14 @@
       font-family: sans-serif;
     }
 
-    /* メイン釣堀キャンバス領域 */
     #stage-wrap {
       position: relative;
-      flex: 1;
+      flex: 1 1 auto;
+      min-height: 180px;
       width: 100%;
       overflow: hidden;
       cursor: pointer;
+      background: radial-gradient(circle at 50% 25%, #0e1d2d 0%, #04070c 80%);
     }
 
     #pond-canvas {
@@ -204,7 +205,6 @@
       height: 100%;
     }
 
-    /* 状態メッセージ＆ヒット警告 */
     #status-overlay {
       position: absolute;
       top: 16px;
@@ -247,10 +247,10 @@
       min-height: 1.1em;
     }
 
-    /* 下部アクションバー */
     footer {
       position: relative;
       z-index: 10;
+      flex-shrink: 0;
       padding: 10px 14px 14px;
       background: linear-gradient(to top, rgba(4, 7, 12, 0.98), rgba(7, 11, 19, 0.88));
       border-top: 1px solid var(--border-dim);
@@ -302,7 +302,6 @@
       background: rgba(34, 48, 68, 0.95);
     }
 
-    /* モーダル共通 */
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -361,7 +360,6 @@
       -webkit-overflow-scrolling: touch;
     }
 
-    /* 釣果発表カード */
     .catch-art-frame {
       position: relative;
       width: 100%;
@@ -448,7 +446,6 @@
       cursor: pointer;
     }
 
-    /* 図鑑グリッド */
     .zukan-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -549,7 +546,6 @@
     </footer>
   </div>
 
-  <!-- 釣果発表モーダル -->
   <div id="catch-modal" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-header">
@@ -575,7 +571,6 @@
     </div>
   </div>
 
-  <!-- 怪異図鑑モーダル -->
   <div id="zukan-modal" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-header">
@@ -602,6 +597,11 @@
   </div>
 
   <script>
+    window.addEventListener("error", (ev) => {
+      const sp = document.getElementById("status-pill");
+      if (sp) sp.textContent = "表示エラー: " + (ev.message || "不明");
+    });
+
     const MONSTERS = [
       { id: 1, name: "白濁した目の深海魚", rarity: "common", desc: "光の届かない底で暮らしていたはずだが、その白く濁った目は確かにこちらを捉えている。" },
       { id: 2, name: "片方だけの子供用長靴", rarity: "common", desc: "泥と藻がこびりついた黄色い長靴。中にはまだ、冷たい海水と何か柔らかいものが詰まっている。" },
@@ -642,4 +642,1184 @@
       common: { label: "コモン", className: "rarity-common" },
       rare: { label: "レア", className: "rarity-rare" },
       epic: { label: "激レア", className: "rarity-epic" },
-      legend: 
+      legend: { label: "主クラス", className: "rarity-legend" }
+    };
+
+    const BAITS = {
+      worm: { name: "普通のミミズ", unlockAt: 0, weights: { common: 0.72, rare: 0.23, epic: 0.045, legend: 0.005 } },
+      plankton: { name: "光るプランクトン", unlockAt: 5, weights: { common: 0.40, rare: 0.40, epic: 0.16, legend: 0.04 } },
+      offering: { name: "禁断のお供え物", unlockAt: 15, weights: { common: 0.15, rare: 0.35, epic: 0.32, legend: 0.18 } }
+    };
+
+    const STORAGE_KEY = "abyss_horror_fishing_v4";
+
+    function defaultSave() {
+      return { totalCatches: 0, currentBait: "worm", caughtCounts: {} };
+    }
+
+    let saveData = loadSave();
+
+    function loadSave() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return defaultSave();
+        const parsed = JSON.parse(raw);
+        return {
+          totalCatches: Number(parsed.totalCatches) || 0,
+          currentBait: BAITS[parsed.currentBait] ? parsed.currentBait : "worm",
+          caughtCounts: parsed.caughtCounts && typeof parsed.caughtCounts === "object" ? parsed.caughtCounts : {}
+        };
+      } catch {
+        return defaultSave();
+      }
+    }
+
+    function persistSave() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+      } catch {}
+    }
+
+    function getUniqueCount() {
+      return Object.keys(saveData.caughtCounts).filter((id) => saveData.caughtCounts[id] > 0).length;
+    }
+
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      ensureCtx() {
+        if (!this.enabled) return null;
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === "suspended") {
+          this.ctx.resume().catch(() => {});
+        }
+        return this.ctx;
+      }
+
+      playSplash(pitch = 220, duration = 0.16) {
+        const ctx = this.ensureCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const bufferSize = Math.floor(ctx.sampleRate * duration);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.45));
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(pitch * 2.2, now);
+        filter.frequency.exponentialRampToValueAtTime(pitch * 0.6, now + duration);
+        filter.Q.value = 1.6;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        noise.start(now);
+      }
+
+      playNibble() { this.playSplash(380, 0.07); }
+
+      playHit() {
+        const ctx = this.ensureCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc1 = ctx.createOscillator();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(95, now);
+        osc1.frequency.exponentialRampToValueAtTime(36, now + 0.25);
+        const g1 = ctx.createGain();
+        g1.gain.setValueAtTime(0.32, now);
+        g1.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+        osc1.connect(g1);
+        g1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.27);
+        this.playSplash(170, 0.22);
+      }
+
+      playMiss() {
+        const ctx = this.ensureCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(210, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now + 0.22);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.23);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.24);
+      }
+
+      playCatch(rarity) {
+        const ctx = this.ensureCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        if (rarity === "epic" || rarity === "legend") {
+          [110, 116.5, 220, 311.13].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            osc.type = idx % 2 === 0 ? "sawtooth" : "sine";
+            osc.frequency.setValueAtTime(freq, now);
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.07, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.82);
+          });
+        } else {
+          this.playSplash(260, 0.25);
+        }
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    const pondCanvas = document.getElementById("pond-canvas");
+    const pondCtx = pondCanvas.getContext("2d");
+    let viewW = 360;
+    let viewH = 420;
+
+    function resizePondCanvas() {
+      const rect = pondCanvas.parentElement.getBoundingClientRect();
+      viewW = Math.max(240, Math.floor(rect.width || window.innerWidth));
+      viewH = Math.max(220, Math.floor(rect.height || window.innerHeight * 0.6));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      pondCanvas.width = Math.floor(viewW * dpr);
+      pondCanvas.height = Math.floor(viewH * dpr);
+      pondCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    window.addEventListener("resize", resizePondCanvas);
+    setTimeout(resizePondCanvas, 50);
+    resizePondCanvas();
+
+    let gameState = "idle";
+    let stateTimer = 0;
+    let nextEventTime = 0;
+    let nibbleCount = 0;
+    let plannedMonster = null;
+    let bobberSink = 0;
+    let ripples = [];
+    let bubbles = [];
+    let shadows = [];
+    let mistPatches = [];
+
+    function initAmbientEntities() {
+      bubbles = Array.from({ length: 22 }, () => ({
+        x: Math.random(),
+        y: 0.45 + Math.random() * 0.55,
+        r: 1.4 + Math.random() * 3.8,
+        speed: 0.018 + Math.random() * 0.042,
+        wobble: Math.random() * Math.PI * 2
+      }));
+
+      shadows = Array.from({ length: 5 }, (_, i) => ({
+        x: Math.random() * 1.4 - 0.2,
+        y: 0.55 + i * 0.1,
+        len: 85 + Math.random() * 105,
+        thick: 14 + Math.random() * 18,
+        dir: i % 2 === 0 ? 1 : -1,
+        speed: 0.025 + Math.random() * 0.032,
+        alpha: 0.16 + Math.random() * 0.14
+      }));
+
+      mistPatches = Array.from({ length: 6 }, (_, i) => ({
+        x: (i * 0.22) % 1.2,
+        y: 0.39 + (i % 3) * 0.025,
+        rx: 95 + (i % 3) * 35,
+        ry: 16 + (i % 2) * 8,
+        speed: 0.012 + (i % 3) * 0.005,
+        alpha: 0.06 + (i % 2) * 0.04
+      }));
+    }
+    initAmbientEntities();
+
+    function addRipple(x, y, maxR = 48, alpha = 0.6) {
+      ripples.push({ x, y, r: 4, maxR, alpha });
+    }
+
+    function pickMonsterByBait(baitKey) {
+      const bait = BAITS[baitKey] || BAITS.worm;
+      const r = Math.random();
+      let acc = 0;
+      let chosenRarity = "common";
+      for (const rar of ["common", "rare", "epic", "legend"]) {
+        acc += bait.weights[rar];
+        if (r <= acc) {
+          chosenRarity = rar;
+          break;
+        }
+      }
+      const pool = MONSTERS.filter((m) => m.rarity === chosenRarity);
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    const statusPill = document.getElementById("status-pill");
+    const omenText = document.getElementById("omen-text");
+    const actionBtn = document.getElementById("action-btn");
+
+    function setStatus(text, isHit = false, omen = "") {
+      statusPill.textContent = text;
+      statusPill.classList.toggle("hit-alert", isHit);
+      omenText.textContent = omen;
+    }
+
+    function startCasting() {
+      if (gameState !== "idle") return;
+      sound.playSplash(250, 0.18);
+      gameState = "waiting";
+      stateTimer = 0;
+      nibbleCount = 0;
+      bobberSink = 0;
+      plannedMonster = pickMonsterByBait(saveData.currentBait);
+
+      addRipple(viewW * 0.5, viewH * 0.44, 56, 0.7);
+
+      const isDangerous = plannedMonster.rarity === "epic" || plannedMonster.rarity === "legend";
+      const omen = isDangerous
+        ? (saveData.currentBait === "offering"
+          ? "…水底の気配が異常に膨らんでいる…"
+          : "…どこかから冷たい視線を感じる…")
+        : "";
+
+      nextEventTime = 1.1 + Math.random() * 1.4;
+      setStatus("浮きを見つめろ…（まだ引くな）", false, omen);
+      actionBtn.textContent = "待つ…（まだ引かない）";
+      actionBtn.classList.remove("pulling");
+    }
+
+    function triggerBite() {
+      gameState = "bite";
+      stateTimer = 0;
+      bobberSink = 1;
+      sound.playHit();
+
+      addRipple(viewW * 0.5, viewH * 0.44, 92, 0.92);
+
+      const appEl = document.getElementById("app");
+      appEl.classList.remove("shake-light", "shake-heavy");
+      void appEl.offsetWidth;
+      appEl.classList.add(plannedMonster.rarity === "epic" || plannedMonster.rarity === "legend" ? "shake-heavy" : "shake-light");
+
+      setStatus("！今だ！引き上げろ！", true, omenText.textContent);
+      actionBtn.textContent = "！今すぐ引き上げる！";
+      actionBtn.classList.add("pulling");
+    }
+
+    function handlePullAttempt() {
+      if (gameState === "idle") {
+        startCasting();
+        return;
+      }
+
+      if (gameState === "waiting" || gameState === "nibble") {
+        sound.playMiss();
+        gameState = "idle";
+        bobberSink = 0;
+        setStatus("早すぎた…怪異は闇へ消えた", false, "");
+        actionBtn.textContent = "糸を垂らす";
+        actionBtn.classList.remove("pulling");
+        return;
+      }
+
+      if (gameState === "bite") {
+        gameState = "resolving";
+        bobberSink = 0;
+        actionBtn.textContent = "糸を垂らす";
+        actionBtn.classList.remove("pulling");
+        setStatus("水面をタップして糸を垂らそう", false, "");
+
+        const caughtMonster = plannedMonster;
+        plannedMonster = null;
+        gameState = "idle";
+        recordCatchAndShowModal(caughtMonster);
+      }
+    }
+
+    function recordCatchAndShowModal(monster) {
+      const idStr = String(monster.id);
+      const isNew = !saveData.caughtCounts[idStr] || saveData.caughtCounts[idStr] <= 0;
+      saveData.caughtCounts[idStr] = (saveData.caughtCounts[idStr] || 0) + 1;
+      saveData.totalCatches += 1;
+      persistSave();
+
+      refreshUI();
+      sound.playCatch(monster.rarity);
+
+      const appEl = document.getElementById("app");
+      if (monster.rarity === "epic" || monster.rarity === "legend") {
+        appEl.classList.remove("horror-flash");
+        void appEl.offsetWidth;
+        appEl.classList.add("horror-flash");
+      }
+
+      openCatchModal(monster, isNew);
+    }
+
+    let lastTime = performance.now();
+    function updateAndRender(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+      const t = now / 1000;
+
+      const w = viewW;
+      const h = viewH;
+      const waterY = h * 0.42;
+      const bobberX = w * 0.5;
+      let bobberY = waterY + 12 + Math.sin(t * 2.4) * 3.5;
+
+      if (gameState === "waiting") {
+        stateTimer += dt;
+        if (stateTimer >= nextEventTime) {
+          if (nibbleCount < 2 && Math.random() < 0.65) {
+            gameState = "nibble";
+            stateTimer = 0;
+            nibbleCount += 1;
+            bobberSink = 0.45;
+            sound.playNibble();
+            addRipple(bobberX, waterY + 12, 30, 0.5);
+            setStatus("浮きが揺れた…フェイントかも？", false, omenText.textContent);
+            nextEventTime = 0.55 + Math.random() * 0.45;
+          } else {
+            triggerBite();
+          }
+        }
+      } else if (gameState === "nibble") {
+        stateTimer += dt;
+        bobberSink = Math.max(0, bobberSink - dt * 1.4);
+        if (stateTimer >= nextEventTime) {
+          gameState = "waiting";
+          stateTimer = 0;
+          bobberSink = 0;
+          nextEventTime = 0.65 + Math.random() * 0.9;
+          setStatus("じっと待て…本命の引きを逃すな", false, omenText.textContent);
+        }
+      } else if (gameState === "bite") {
+        stateTimer += dt;
+        bobberSink = 1;
+        if (stateTimer > 1.65) {
+          sound.playMiss();
+          gameState = "idle";
+          bobberSink = 0;
+          setStatus("逃げられた…深淵が笑っている", false, "");
+          actionBtn.textContent = "糸を垂らす";
+          actionBtn.classList.remove("pulling");
+        }
+      }
+
+      if (gameState === "bite") {
+        bobberY = waterY + 34 + Math.sin(t * 36) * 5;
+      } else if (bobberSink > 0) {
+        bobberY += bobberSink * 20;
+      }
+
+      pondCtx.clearRect(0, 0, w, h);
+
+      const skyGrad = pondCtx.createLinearGradient(0, 0, 0, waterY);
+      if (saveData.currentBait === "offering") {
+        skyGrad.addColorStop(0, "#070306");
+        skyGrad.addColorStop(0.6, "#1f0b15");
+        skyGrad.addColorStop(1, "#11070d");
+      } else {
+        skyGrad.addColorStop(0, "#040810");
+        skyGrad.addColorStop(0.6, "#0e1d2d");
+        skyGrad.addColorStop(1, "#08121d");
+      }
+      pondCtx.fillStyle = skyGrad;
+      pondCtx.fillRect(0, 0, w, waterY + 2);
+
+      const moonX = w * 0.78;
+      const moonY = h * 0.14;
+      const moonGlow = pondCtx.createRadialGradient(moonX, moonY, 3, moonX, moonY, 85);
+      moonGlow.addColorStop(0, saveData.currentBait === "offering" ? "rgba(255, 115, 135, 0.42)" : "rgba(200, 230, 250, 0.34)");
+      moonGlow.addColorStop(0.55, saveData.currentBait === "offering" ? "rgba(140, 25, 50, 0.12)" : "rgba(80, 130, 170, 0.1)");
+      moonGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
+      pondCtx.fillStyle = moonGlow;
+      pondCtx.beginPath();
+      pondCtx.arc(moonX, moonY, 85, 0, Math.PI * 2);
+      pondCtx.fill();
+
+      const moonBody = pondCtx.createRadialGradient(moonX - 4, moonY - 4, 2, moonX, moonY, 18);
+      moonBody.addColorStop(0, saveData.currentBait === "offering" ? "#ffd6dc" : "#eef6fc");
+      moonBody.addColorStop(1, saveData.currentBait === "offering" ? "rgba(210, 90, 115, 0.5)" : "rgba(155, 185, 205, 0.45)");
+      pondCtx.fillStyle = moonBody;
+      pondCtx.beginPath();
+      pondCtx.arc(moonX, moonY, 18, 0, Math.PI * 2);
+      pondCtx.fill();
+
+      const pierGrad = pondCtx.createLinearGradient(0, waterY - 26, 0, waterY + 12);
+      pierGrad.addColorStop(0, "#171310");
+      pierGrad.addColorStop(1, "#06070a");
+      pondCtx.fillStyle = pierGrad;
+      pondCtx.beginPath();
+      pondCtx.moveTo(0, waterY - 24);
+      pondCtx.lineTo(w * 0.29, waterY - 10);
+      pondCtx.lineTo(w * 0.29, waterY + 5);
+      pondCtx.lineTo(0, waterY + 12);
+      pondCtx.closePath();
+      pondCtx.fill();
+
+      const lanternX = w * 0.16;
+      const lanternY = waterY - 58 + Math.sin(t * 2.1) * 2.2;
+      const lanternPulse = 0.86 + Math.sin(t * 7.5) * 0.11;
+      const lanternGrad = pondCtx.createRadialGradient(lanternX, lanternY + 9, 2, lanternX, lanternY + 9, 98 * lanternPulse);
+      lanternGrad.addColorStop(0, "rgba(255, 165, 70, 0.38)");
+      lanternGrad.addColorStop(0.45, "rgba(205, 80, 25, 0.14)");
+      lanternGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+      pondCtx.fillStyle = lanternGrad;
+      pondCtx.beginPath();
+      pondCtx.arc(lanternX, lanternY + 9, 98 * lanternPulse, 0, Math.PI * 2);
+      pondCtx.fill();
+
+      pondCtx.strokeStyle = "#14181f";
+      pondCtx.lineWidth = 2;
+      pondCtx.beginPath();
+      pondCtx.moveTo(lanternX, waterY - 17);
+      pondCtx.lineTo(lanternX, lanternY);
+      pondCtx.stroke();
+
+      const lBody = pondCtx.createRadialGradient(lanternX - 3, lanternY + 6, 2, lanternX, lanternY + 9, 12);
+      lBody.addColorStop(0, "#ffbe6b");
+      lBody.addColorStop(0.65, "#b84a12");
+      lBody.addColorStop(1, "#2b1006");
+      pondCtx.fillStyle = lBody;
+      pondCtx.beginPath();
+      pondCtx.ellipse(lanternX, lanternY + 9, 9.5, 12.5, 0, 0, Math.PI * 2);
+      pondCtx.fill();
+
+      const waterGrad = pondCtx.createLinearGradient(0, waterY, 0, h);
+      if (saveData.currentBait === "offering") {
+        waterGrad.addColorStop(0, "#210b16");
+        waterGrad.addColorStop(0.35, "#0d040a");
+        waterGrad.addColorStop(1, "#020103");
+      } else if (saveData.currentBait === "plankton") {
+        waterGrad.addColorStop(0, "#0c293d");
+        waterGrad.addColorStop(0.35, "#05121e");
+        waterGrad.addColorStop(1, "#020509");
+      } else {
+        waterGrad.addColorStop(0, "#0b202e");
+        waterGrad.addColorStop(0.35, "#050e17");
+        waterGrad.addColorStop(1, "#020408");
+      }
+      pondCtx.fillStyle = waterGrad;
+      pondCtx.fillRect(0, waterY, w, h - waterY);
+
+      for (let i = 0; i < 9; i++) {
+        const refX = (i % 2 === 0 ? lanternX : moonX) + Math.sin(t * 2.2 + i * 1.4) * (14 + i * 3);
+        const refY = waterY + 8 + i * 13;
+        const refW = 18 + (i % 3) * 10;
+        const refGrad = pondCtx.createLinearGradient(refX - refW * 0.5, refY, refX + refW * 0.5, refY);
+        refGrad.addColorStop(0, "rgba(0,0,0,0)");
+        refGrad.addColorStop(0.5, i % 2 === 0
+          ? `rgba(255, 155, 75, ${0.14 - i * 0.012})`
+          : `rgba(165, 215, 240, ${0.11 - i * 0.01})`);
+        refGrad.addColorStop(1, "rgba(0,0,0,0)");
+        pondCtx.fillStyle = refGrad;
+        pondCtx.fillRect(refX - refW * 0.5, refY, refW, 2.5);
+      }
+
+      pondCtx.strokeStyle = "rgba(165, 215, 240, 0.25)";
+      pondCtx.lineWidth = 1.5;
+      pondCtx.beginPath();
+      for (let x = 0; x <= w; x += 8) {
+        const wy = waterY + Math.sin(x * 0.035 + t * 2.5) * 2.3;
+        if (x === 0) pondCtx.moveTo(x, wy);
+        else pondCtx.lineTo(x, wy);
+      }
+      pondCtx.stroke();
+
+      for (const m of mistPatches) {
+        m.x += m.speed * dt;
+        if (m.x > 1.25) m.x = -0.25;
+        const mx = m.x * w;
+        const my = m.y * h + Math.sin(t * 1.2 + m.x * 6) * 2;
+        const mGrad = pondCtx.createRadialGradient(mx, my, 2, mx, my, m.rx);
+        mGrad.addColorStop(0, `rgba(180, 210, 225, ${m.alpha})`);
+        mGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+        pondCtx.fillStyle = mGrad;
+        pondCtx.beginPath();
+        pondCtx.ellipse(mx, my, m.rx, m.ry, 0, 0, Math.PI * 2);
+        pondCtx.fill();
+      }
+
+      for (const sh of shadows) {
+        sh.x += sh.dir * sh.speed * dt;
+        if (sh.dir > 0 && sh.x > 1.35) sh.x = -0.35;
+        if (sh.dir < 0 && sh.x < -0.35) sh.x = 1.35;
+        const sx = sh.x * w;
+        const sy = sh.y * h + Math.sin(t * 1.4 + sh.y * 10) * 4;
+        const grad = pondCtx.createLinearGradient(sx - sh.len * 0.5, sy, sx + sh.len * 0.5, sy);
+        grad.addColorStop(0, "rgba(0, 0, 0, 0)");
+        grad.addColorStop(0.5, `rgba(0, 0, 0, ${sh.alpha + (gameState === "bite" ? 0.24 : 0)})`);
+        grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+        pondCtx.fillStyle = grad;
+        pondCtx.beginPath();
+        pondCtx.ellipse(sx, sy, sh.len * 0.5, sh.thick * 0.5, Math.sin(t + sh.y) * 0.08, 0, Math.PI * 2);
+        pondCtx.fill();
+      }
+
+      for (const b of bubbles) {
+        b.y -= b.speed * dt;
+        b.wobble += dt * 3.2;
+        if (b.y < waterY / h + 0.02) {
+          b.y = 0.98;
+          b.x = Math.random();
+        }
+        const bx = b.x * w + Math.sin(b.wobble) * 6;
+        const by = b.y * h;
+        pondCtx.strokeStyle = saveData.currentBait === "plankton"
+          ? "rgba(114, 239, 221, 0.42)"
+          : "rgba(180, 220, 240, 0.22)";
+        pondCtx.lineWidth = 1.1;
+        pondCtx.beginPath();
+        pondCtx.arc(bx, by, b.r, 0, Math.PI * 2);
+        pondCtx.stroke();
+      }
+
+      for (let i = ripples.length - 1; i >= 0; i--) {
+        const rp = ripples[i];
+        rp.r += 50 * dt;
+        rp.alpha -= 0.72 * dt;
+        if (rp.alpha <= 0 || rp.r >= rp.maxR) {
+          ripples.splice(i, 1);
+          continue;
+        }
+        pondCtx.strokeStyle = `rgba(195, 235, 255, ${rp.alpha})`;
+        pondCtx.lineWidth = 1.5;
+        pondCtx.beginPath();
+        pondCtx.ellipse(rp.x, rp.y, rp.r * 1.45, rp.r * 0.42, 0, 0, Math.PI * 2);
+        pondCtx.stroke();
+      }
+
+      if (gameState !== "idle") {
+        pondCtx.strokeStyle = "rgba(230, 244, 255, 0.6)";
+        pondCtx.lineWidth = 1.15;
+        pondCtx.beginPath();
+        pondCtx.moveTo(w * 0.18, waterY - 12);
+        pondCtx.quadraticCurveTo(w * 0.34, waterY - 26, bobberX, bobberY - 7);
+        pondCtx.stroke();
+
+        const bobGrad = pondCtx.createRadialGradient(bobberX - 2.5, bobberY - 3.5, 1, bobberX, bobberY, 9);
+        if (gameState === "bite") {
+          bobGrad.addColorStop(0, "#ffb3c1");
+          bobGrad.addColorStop(0.5, "#c9184a");
+          bobGrad.addColorStop(1, "#3b030c");
+        } else {
+          bobGrad.addColorStop(0, "#ff758f");
+          bobGrad.addColorStop(0.55, "#8b1e24");
+          bobGrad.addColorStop(1, "#1e293b");
+        }
+        pondCtx.fillStyle = bobGrad;
+        pondCtx.beginPath();
+        pondCtx.arc(bobberX, bobberY, 7.8, 0, Math.PI * 2);
+        pondCtx.fill();
+
+        if (gameState === "bite") {
+          pondCtx.fillStyle = "#ff4d6d";
+          pondCtx.font = "900 28px sans-serif";
+          pondCtx.textAlign = "center";
+          pondCtx.fillText("！", bobberX, bobberY - 22);
+        }
+      }
+
+      requestAnimationFrame(updateAndRender);
+    }
+    requestAnimationFrame(updateAndRender);
+
+    function applyWetGloss(ctx, cx, cy, rx, ry, angle = -0.35, alpha = 0.28) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      const g = ctx.createLinearGradient(0, -ry, 0, ry * 0.4);
+      g.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+      g.addColorStop(1, "rgba(255, 255, 255, 0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(0, -ry * 0.25, rx, ry * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawWaterDrops(ctx, drops) {
+      for (const [dx, dy, r] of drops) {
+        const dg = ctx.createRadialGradient(dx - r * 0.35, dy - r * 0.35, r * 0.1, dx, dy, r);
+        dg.addColorStop(0, "rgba(255, 255, 255, 0.75)");
+        dg.addColorStop(0.6, "rgba(155, 215, 240, 0.35)");
+        dg.addColorStop(1, "rgba(30, 70, 95, 0.1)");
+        ctx.fillStyle = dg;
+        ctx.beginPath();
+        ctx.arc(dx, dy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawMonsterArt(canvas, monster, isUnlocked = true) {
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const bg = ctx.createRadialGradient(w * 0.5, h * 0.45, 14, w * 0.5, h * 0.5, w * 0.75);
+      if (!isUnlocked) {
+        bg.addColorStop(0, "#111824");
+        bg.addColorStop(1, "#030508");
+      } else if (monster.rarity === "legend") {
+        bg.addColorStop(0, "#380b18");
+        bg.addColorStop(0.55, "#140409");
+        bg.addColorStop(1, "#030102");
+      } else if (monster.rarity === "epic") {
+        bg.addColorStop(0, "#27113d");
+        bg.addColorStop(0.55, "#0e0617");
+        bg.addColorStop(1, "#030206");
+      } else if (monster.rarity === "rare") {
+        bg.addColorStop(0, "#0d2a3d");
+        bg.addColorStop(0.55, "#06111a");
+        bg.addColorStop(1, "#02060a");
+      } else {
+        bg.addColorStop(0, "#1a2633");
+        bg.addColorStop(0.55, "#0b1118");
+        bg.addColorStop(1, "#030508");
+      }
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+
+      for (let i = 0; i < 360; i++) {
+        const nx = (i * 89 + monster.id * 17) % w;
+        const ny = (i * 151 + monster.id * 31) % h;
+        ctx.fillStyle = i % 3 === 0 ? "rgba(255,255,255,0.035)" : "rgba(0,0,0,0.28)";
+        ctx.fillRect(nx, ny, 2, 2);
+      }
+
+      ctx.save();
+      if (!isUnlocked) {
+        ctx.fillStyle = "rgba(6, 9, 14, 0.94)";
+        ctx.beginPath();
+        ctx.ellipse(w * 0.5, h * 0.54, w * 0.25, h * 0.29, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(155, 175, 195, 0.45)";
+        ctx.font = "700 46px serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("？", w * 0.5, h * 0.54);
+        ctx.restore();
+        return;
+      }
+
+      const cx = w * 0.5;
+      const cy = h * 0.52;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      switch (monster.id) {
+        case 1: {
+          const bodyGrad = ctx.createLinearGradient(cx - 80, cy - 45, cx + 90, cy + 45);
+          bodyGrad.addColorStop(0, "#2f4858");
+          bodyGrad.addColorStop(0.55, "#162430");
+          bodyGrad.addColorStop(1, "#070c12");
+          ctx.fillStyle = bodyGrad;
+          ctx.beginPath();
+          ctx.moveTo(cx - 88, cy);
+          ctx.quadraticCurveTo(cx, cy - 54, cx + 76, cy - 9);
+          ctx.lineTo(cx + 112, cy - 34);
+          ctx.lineTo(cx + 100, cy);
+          ctx.lineTo(cx + 112, cy + 34);
+          ctx.lineTo(cx + 76, cy + 9);
+          ctx.quadraticCurveTo(cx, cy + 54, cx - 88, cy);
+          ctx.fill();
+          ctx.strokeStyle = "#05080c";
+          ctx.lineWidth = 3;
+          ctx.stroke();
+
+          const eyeGrad = ctx.createRadialGradient(cx - 52, cy - 13, 2, cx - 48, cy - 10, 16);
+          eyeGrad.addColorStop(0, "#ffffff");
+          eyeGrad.addColorStop(0.65, "#cbd8e0");
+          eyeGrad.addColorStop(1, "#5c707d");
+          ctx.fillStyle = eyeGrad;
+          ctx.beginPath();
+          ctx.arc(cx - 48, cy - 10, 15.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(110, 135, 150, 0.5)";
+          ctx.beginPath();
+          ctx.arc(cx - 50, cy - 12, 6.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          applyWetGloss(ctx, cx - 10, cy - 18, 52, 18, -0.15, 0.25);
+          drawWaterDrops(ctx, [[cx - 20, cy + 28, 3.5], [cx + 30, cy - 22, 2.8], [cx - 65, cy + 12, 3]]);
+          break;
+        }
+        case 2: {
+          const bootGrad = ctx.createLinearGradient(cx - 35, cy - 68, cx + 80, cy + 48);
+          bootGrad.addColorStop(0, "#b89022");
+          bootGrad.addColorStop(0.55, "#6e5210");
+          bootGrad.addColorStop(1, "#291d05");
+          ctx.fillStyle = bootGrad;
+          ctx.strokeStyle = "#120c02";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(cx - 32, cy - 68);
+          ctx.lineTo(cx + 22, cy - 68);
+          ctx.lineTo(cx + 22, cy + 16);
+          ctx.quadraticCurveTo(cx + 78, cy + 18, cx + 82, cy + 48);
+          ctx.lineTo(cx - 38, cy + 48);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "rgba(12, 10, 7, 0.68)";
+          ctx.beginPath();
+          ctx.roundRect(cx - 38, cy + 24, 120, 24, 5);
+          ctx.fill();
+          applyWetGloss(ctx, cx - 5, cy - 25, 22, 36, -0.1, 0.24);
+          break;
+        }
+        case 3: {
+          const g = ctx.createRadialGradient(cx - 16, cy - 8, 8, cx, cy + 8, 60);
+          g.addColorStop(0, "#a68952");
+          g.addColorStop(0.65, "#4d3c20");
+          g.addColorStop(1, "#1c150a");
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(cx, cy + 8, 56, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#0e0a05";
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          ctx.fillStyle = "#5c4a2a";
+          ctx.fillRect(cx - 8, cy - 58, 16, 12);
+          [[cx - 32, cy - 16, 11.5], [cx + 26, cy - 22, 13.5], [cx + 18, cy + 28, 12.5], [cx - 24, cy + 30, 9.5]].forEach(([bx, by, br]) => {
+            ctx.fillStyle = "#b8b2a6";
+            ctx.beginPath();
+            ctx.arc(bx, by, br, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#0e0c0a";
+            ctx.beginPath();
+            ctx.arc(bx, by, br * 0.44, 0, Math.PI * 2);
+            ctx.fill();
+          });
+          applyWetGloss(ctx, cx - 12, cy - 24, 34, 16, -0.3, 0.22);
+          break;
+        }
+        case 4: {
+          const glassGrad = ctx.createLinearGradient(cx - 34, cy - 40, cx + 34, cy + 60);
+          glassGrad.addColorStop(0, "rgba(190, 235, 250, 0.38)");
+          glassGrad.addColorStop(0.5, "rgba(90, 145, 170, 0.16)");
+          glassGrad.addColorStop(1, "rgba(180, 225, 245, 0.32)");
+          ctx.fillStyle = glassGrad;
+          ctx.strokeStyle = "#9ec8dc";
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.roundRect(cx - 34, cy - 36, 68, 96, 12);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#6e4726";
+          ctx.fillRect(cx - 16, cy - 54, 32, 20);
+          ctx.fillStyle = "#05070a";
+          ctx.beginPath();
+          ctx.roundRect(cx - 30, cy - 8, 60, 64, 8);
+          ctx.fill();
+          break;
+        }
+        case 5: {
+          ctx.strokeStyle = "#090b10";
+          ctx.lineWidth = 2.8;
+          for (let i = -5; i <= 5; i++) {
+            ctx.beginPath();
+            ctx.moveTo(cx + i * 11, cy - 45);
+            ctx.bezierCurveTo(cx + i * 24 + 20, cy + 10, cx + i * 8 - 25, cy + 55, cx + i * 18, cy + 92);
+            ctx.stroke();
+          }
+          ctx.fillStyle = "#472e1c";
+          ctx.fillRect(cx - 58, cy - 56, 116, 18);
+          applyWetGloss(ctx, cx, cy + 25, 42, 22, 0.1, 0.22);
+          break;
+        }
+        case 7: {
+          const porcelain = ctx.createRadialGradient(cx + 14, cy - 14, 6, cx, cy, 56);
+          porcelain.addColorStop(0, "#f2ece1");
+          porcelain.addColorStop(0.7, "#c9beae");
+          porcelain.addColorStop(1, "#5c5348");
+          ctx.fillStyle = porcelain;
+          ctx.strokeStyle = "#241e18";
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 52, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#05070b";
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - 52);
+          ctx.lineTo(cx - 52, cy - 20);
+          ctx.lineTo(cx - 24, cy + 10);
+          ctx.lineTo(cx - 48, cy + 36);
+          ctx.lineTo(cx, cy + 52);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = "#f8fafc";
+          ctx.beginPath();
+          ctx.ellipse(cx + 22, cy - 4, 11.5, 8.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#1d3557";
+          ctx.beginPath();
+          ctx.arc(cx + 22, cy - 8, 4.8, 0, Math.PI * 2);
+          ctx.fill();
+          applyWetGloss(ctx, cx + 22, cy - 24, 24, 12, -0.2, 0.3);
+          break;
+        }
+        case 12: {
+          const shell = ctx.createRadialGradient(cx - 12, cy - 12, 6, cx, cy, 58);
+          shell.addColorStop(0, "#a89b8c");
+          shell.addColorStop(0.7, "#5e5449");
+          shell.addColorStop(1, "#241f1a");
+          ctx.fillStyle = shell;
+          ctx.strokeStyle = "#17130f";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 58, 42, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          const flesh = ctx.createRadialGradient(cx + 2, cy - 2, 2, cx + 6, cy + 2, 24);
+          flesh.addColorStop(0, "#b82938");
+          flesh.addColorStop(1, "#4a0b12");
+          ctx.fillStyle = flesh;
+          ctx.beginPath();
+          ctx.ellipse(cx + 6, cy + 2, 24, 14, 0.15, 0, Math.PI * 2);
+          ctx.fill();
+          applyWetGloss(ctx, cx + 6, cy - 3, 16, 7, 0.15, 0.35);
+          break;
+        }
+        case 14: {
+          const gearGrad = ctx.createRadialGradient(cx - 10, cy - 10, 8, cx, cy, 56);
+          gearGrad.addColorStop(0, "#35536b");
+          gearGrad.addColorStop(0.7, "#162430");
+          gearGrad.addColorStop(1, "#070c12");
+          ctx.fillStyle = gearGrad;
+          ctx.strokeStyle = "#48cae4";
+          ctx.lineWidth = 1.8;
+          const teeth = 10;
+          ctx.beginPath();
+          for (let i = 0; i < teeth * 2; i++) {
+            const ang = (i * Math.PI) / teeth;
+            const rad = i % 2 === 0 ? 54 : 40;
+            const px = cx + Math.cos(ang) * rad;
+            const py = cy + Math.sin(ang) * rad;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#04070b";
+          ctx.beginPath();
+          ctx.arc(cx, cy, 16, 0, Math.PI * 2);
+          ctx.fill();
+          applyWetGloss(ctx, cx - 10, cy - 18, 28, 14, -0.3, 0.25);
+          break;
+        }
+        case 15: {
+          ctx.strokeStyle = "#967442";
+          ctx.lineWidth = 10;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - 44);
+          ctx.lineTo(cx, cy + 46);
+          ctx.moveTo(cx - 36, cy - 12);
+          ctx.lineTo(cx + 36, cy - 12);
+          ctx.moveTo(cx, cy + 44);
+          ctx.lineTo(cx - 22, cy + 74);
+          ctx.moveTo(cx, cy + 44);
+          ctx.lineTo(cx + 22, cy + 74);
+          ctx.stroke();
+          ctx.fillStyle = "#a88b59";
+          ctx.beginPath();
+          ctx.arc(cx, cy - 54, 15, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#b5262d";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(cx - 28, cy - 28);
+          ctx.lineTo(cx + 4, cy + 4);
+          ctx.stroke();
+          drawWaterDrops(ctx, [[cx + 6, cy + 8, 3], [cx - 12, cy + 28, 2.5]]);
+          break;
+        }
+        case 23: {
+          const glow = ctx.createRadialGradient(cx, cy, 12, cx, cy, 82);
+          glow.addColorStop(0, "rgba(199, 125, 255, 0.3)");
+          glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 82, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = "#a82832";
+          ctx.lineWidth = 2.6;
+          for (let i = -2; i <= 2; i++) {
+            ctx.beginPath();
+            ctx.moveTo(cx + i * 9, cy + 44);
+            ctx.quadraticCurveTo(cx + i * 18, cy + 68, cx + i * 12, cy + 88);
+            ctx.stroke();
+          }
+
+          const sclera = ctx.createRadialGradient(cx - 12, cy - 14, 6, cx, cy, 48);
+          sclera.addColorStop(0, "#ffffff");
+          sclera.addColorStop(0.75, "#d8d0c8");
+          sclera.addColorStop(1, "#7a6d68");
+          ctx.fillStyle = sclera;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 46, 0, Math.PI * 2);
+          ctx.fill();
+
+          const iris = ctx.createRadialGradient(cx, cy, 4, cx, cy, 22);
+          iris.addColorStop(0, "#9d4edd");
+          iris.addColorStop(1, "#240046");
+          ctx.fillStyle = iris;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#040407";
+          ctx.beginPath();
+          ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+          ctx.fill();
+          applyWetGloss(ctx, cx - 10, cy - 18, 22, 12, -0.3, 0.45);
+          break;
+        }
+        case 29: {
+          const mg = ctx.createRadialGradient(cx, cy, 8, cx, cy, 62);
+          mg.addColorStop(0, "#1d3557");
+          mg.addColorStop(0.75, "#48cae4");
+          mg.addColorStop(1, "#090d16");
+          ctx.fillStyle = mg;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 58, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "rgba(6, 8, 13, 0.84)";
+          ctx.beginPath();
+          ctx.ellipse(cx + 8, cy + 4, 18, 24, 0.1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#ff4d6d";
+          ctx.fillRect(cx + 2, cy - 2, 4, 4);
+          ctx.fillRect(cx + 12, cy - 2, 4, 4);
+          applyWetGloss(ctx, cx - 14, cy - 24, 24, 12, -0.35, 0.28);
+          break;
+        }
+        case 30:
+        default: {
+          const tentacleGrad = ctx.createLinearGradient(cx - 60, cy + 75, cx + 22, cy - 72);
+          tentacleGrad.addColorStop(0, "#050305");
+          tentacleGrad.addColorStop(0.6, "#1a0912");
+          tentacleGrad.addColorStop(1, "#090408");
+          ctx.strokeStyle = tentacleGrad;
+          ctx.lineWidth = 24;
+          ctx.beginPath();
+          ctx.moveTo(cx - 60, cy + 75);
+          ctx.bezierCurveTo(cx - 45, cy + 10, cx + 45, cy - 10, cx + 22, cy - 72);
+          ctx.stroke();
+
+          ctx.strokeStyle = "#b52635";
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+
+          for (let i = 0; i < 6; i++) {
+            const p = i / 5;
+            const sx = cx - 42 + p * 64;
+            const sy = cy + 45 - p * 95;
+            ctx.fillStyle = "#4a1520";
+            ctx.beginPath();
+            ctx.arc(sx, sy, 5.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          applyWetGloss(ctx, cx - 12, cy + 10, 14, 34, -0.4, 0.25);
+          break;
+        }
+      }
+
+      ctx.restore();
+    }
+
+    const collectionBadge = document.getElementById("collection-badge");
+    const baitBtns = document.querySelectorAll(".bait-btn");
+    const unlockPlanktonEl = document.getElementById("unlock-plankton");
+    const unlockOfferingEl = document.getElementById("unlock-offering");
+
+    function refreshUI() {
+      const unique = getUniqueCount();
+      collectionBadge.textContent = `${unique} / ${MONSTERS.length} 種`;
+      const planktonUnlocked = unique >= BAITS.plankton.unlockAt;
+      const offeringUnlocked = unique >= BAITS.offering.unlockAt;
+      unlockPlanktonEl.textContent = planktonUnlocked ? "レア率UP" : `${BAITS.plankton.unlockAt}種で解放`;
+      unlockOfferingEl.textContent = offeringUnlocked ? "怪異・主率UP" : `${BAITS.offering.unlockAt}種で解放`;
+      baitBtns.forEach((btn) => {
+        const key = btn.dataset.bait;
+        const unlocked = key === "worm" || (key === "plankton" && planktonUnlocked) || (key === "offering" && offeringUnlocked);
+        btn.classList.toggle("locked", !unlocked);
+        btn.classList.toggle("active", saveData.currentBait === key && unlocked);
+      });
+    }
+
+    baitBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.dataset.bait;
+        const unique = getUniqueCount();
+        if (key === "plankton" && unique < BAITS.plankton.unlockAt) {
+          setStatus(`「光るプランクトン」は${BAITS.plankton.unlockAt}種集めると解放される`, false, "");
+          return;
+        }
+        if (key === "offering" && unique < BAITS.offering.unlockAt) {
+          setStatus(`「禁断のお供え物」は${BAITS.offering.unlockAt}種集めると解放される`, false, "");
+          return;
+        }
+        saveData.currentBait = key;
+        persistSave();
+        refreshUI();
+        sound.playSplash(310, 0.1);
+        setStatus(`エサを「${BAITS[key].name}」に変えた`, false, "");
+      });
+    });
+
+    const catchModal = document.getElementById("catch-modal");
+    function openCatchModal(monster, isNew) {
+      const rInfo = RARITY_INFO[monster.rarity];
+      drawMonsterArt(document.getElementById("catch-canvas"), monster, true);
+      document.getElementById("catch-rarity").textContent = rInfo.label;
+      document.getElementById("catch-rarity").className = `rarity-tag ${rInfo.className}`;
+      document.getElementById("catch-new-badge").style.display = isNew ? "inline-block" : "none";
+      document.getElementById("catch-name").textContent = `No.${String(monster.id).padStart(3, "0")} ${monster.name}`;
+      document.getElementById("catch-desc").textContent = monster.desc;
+      document.getElementById("catch-count-stat").textContent = `この怪異の捕獲数: ${saveData.caughtCounts[String(monster.id)] || 1}`;
+      document.getElementById("catch-total-stat").textContent = `総釣果: ${saveData.totalCatches}回`;
+      catchModal.classList.add("open");
+    }
+
+    function closeCatchModal() {
+      catchModal.classList.remove("open");
+    }
+
+    document.getElementById("close-catch-btn").addEventListener("click", closeCatchModal);
+    document.getElementById("continue-btn").addEventListener("click", () => {
+      closeCatchModal();
+      startCasting();
+    });
+
+    const zukanModal = document.getElementById("zukan-modal");
+    const zukanGrid = document.getElementById("zukan-grid");
+    const zukanDetail = document.getElementById("zukan-detail");
+    const zukanHeaderTitle = document.getElementById("zukan-header-title");
+
+    function renderZukanGrid() {
+      zukanDetail.style.display = "none";
+      zukanGrid.style.display = "grid";
+      const unique = getUniqueCount();
+      zukanHeaderTitle.textContent = `怪異図鑑 (${unique} / ${MONSTERS.length})`;
+      zukanGrid.innerHTML = "";
+
+      MONSTERS.forEach((m) => {
+        const cnt = saveData.caughtCounts[String(m.id)] || 0;
+        const unlocked = cnt > 0;
+        const card = document.createElement("div");
+        card.className = `zukan-item ${unlocked ? "unlocked" : "locked"}`;
+
+        const thumbWrap = document.createElement("div");
+        thumbWrap.className = "zukan-thumb";
+        const thumbCanvas = document.createElement("canvas");
+        thumbCanvas.width = 160;
+        thumbCanvas.height = 120;
+        drawMonsterArt(thumbCanvas, m, unlocked);
+        thumbWrap.appendChild(thumbCanvas);
+
+        const numEl = document.createElement("div");
+        numEl.className = "zukan-num";
+        numEl.textContent = `#${String(m.id).padStart(3, "0")} ${unlocked ? `×${cnt}` : "未発見"}`;
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "zukan-name";
+        nameEl.textContent = unlocked ? m.name : "？？？";
+
+        card.appendChild(thumbWrap);
+        card.appendChild(numEl);
+        card.appendChild(nameEl);
+
+        card.addEventListener("click", () => {
+          if (!unlocked) {
+            sound.playMiss();
+            return;
+          }
+          showZukanDetail(m, cnt);
+        });
+        zukanGrid.appendChild(card);
+      });
+    }
+
+    function showZukanDetail(monster, cnt) {
+      const rInfo = RARITY_INFO[monster.rarity];
+      zukanGrid.style.display = "none";
+      zukanDetail.style.display = "block";
+      drawMonsterArt(document.getElementById("detail-canvas"), monster, true);
+      document.getElementById("detail-rarity").textContent = rInfo.label;
+      document.getElementById("detail-rarity").className = `rarity-tag ${rInfo.className}`;
+      document.getElementById("detail-name").textContent = monster.name;
+      document.getElementById("detail-desc").textContent = monster.desc;
+      document.getElementById("detail-caught").textContent = `捕獲数: ${cnt}回`;
+      document.getElementById("detail-id").textContent = `No.${String(monster.id).padStart(3, "0")}`;
+    }
+
+    document.getElementById("zukan-btn").addEventListener("click", () => {
+      renderZukanGrid();
+      zukanModal.classList.add("open");
+    });
+    document.getElementById("close-zukan-btn").addEventListener("click", () => {
+      zukanModal.classList.remove("open");
+    });
+    document.getElementById("back-to-grid-btn").addEventListener("click", () => {
+      zukanDetail.style.display = "none";
+      zukanGrid.style.display = "grid";
+    });
+
+    document.getElementById("stage-wrap").addEventListener("pointerdown", (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      handlePullAttempt();
+    });
+    actionBtn.addEventListener("click", handlePullAttempt);
+
+    const soundBtn = document.getElementById("sound-btn");
+    soundBtn.addEventListener("click", () => {
+      sound.enabled = !sound.enabled;
+      soundBtn.textContent = sound.enabled ? "🔊 音ON" : "🔇 音OFF";
+      if (sound.enabled) sound.ensureCtx();
+    });
+
+    document.getElementById("reset-btn").addEventListener("click", () => {
+      if (confirm("釣果と図鑑データをすべて消去しますか？")) {
+        saveData = defaultSave();
+        persistSave();
+        gameState = "idle";
+        bobberSink = 0;
+        actionBtn.textContent = "糸を垂らす";
+        actionBtn.classList.remove("pulling");
+        setStatus("水面をタップして糸を垂らそう", false, "");
+        refreshUI();
+      }
+    });
+
+    refreshUI();
+  </script>
+</body>
+</html>
