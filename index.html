@@ -539,3 +539,293 @@
           const color = pal.streaks[Math.floor(Math.random() * pal.streaks.length)];
           if (horizontal) {
             const row = Math.floor(Math.random() * Math.m
+ax(1, height / GRID_SIZE)) * GRID_SIZE;
+            const dir = Math.random() < 0.5 ? 1 : -1;
+            lightStreaks.push({
+              horizontal: true,
+              x: dir === 1 ? -120 : width + 120,
+              y: row,
+              vx: dir * (3.6 + Math.random() * 4.8),
+              vy: 0,
+              length: 75 + Math.random() * 115,
+              color
+            });
+          } else {
+            const col = Math.floor(Math.random() * Math.max(1, width / GRID_SIZE)) * GRID_SIZE;
+            const dir = Math.random() < 0.5 ? 1 : -1;
+            lightStreaks.push({
+              horizontal: false,
+              x: col,
+              y: dir === 1 ? -120 : height + 120,
+              vx: 0,
+              vy: dir * (3.6 + Math.random() * 4.8),
+              length: 75 + Math.random() * 115,
+              color
+            });
+          }
+        }
+      }
+
+      function spawnCursorDust(x, y, count = 3) {
+        const pal = PALETTES[paletteIdx];
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const spd = 0.6 + Math.random() * 2.4;
+          cursorParticles.push({
+            x,
+            y,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd - 0.4,
+            size: Math.random() < 0.35 ? 4 : 2,
+            color: pal.streaks[Math.floor(Math.random() * pal.streaks.length)],
+            alpha: 1
+          });
+        }
+      }
+
+      function spawnTapRipple(x, y) {
+        const pal = PALETTES[paletteIdx];
+        tapRipples.push({
+          x,
+          y,
+          radius: 8,
+          maxRadius: 150,
+          alpha: 0.75,
+          color: pal.streaks[Math.floor(Math.random() * pal.streaks.length)]
+        });
+      }
+
+      function spawnTapPopBurst(x, y) {
+        const icons = ['✦', '★', '♥', '✧', '♪'];
+        const colors = ['#22d3ee', '#e879f9', '#fbbf24', '#f472b6', '#38bdf8'];
+        const count = 7;
+        for (let i = 0; i < count; i++) {
+          const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.45;
+          const dist = 36 + Math.random() * 38;
+          const el = document.createElement('span');
+          el.className = 'tap-pop-item';
+          el.textContent = icons[Math.floor(Math.random() * icons.length)];
+          el.style.left = `${x}px`;
+          el.style.top = `${y}px`;
+          el.style.color = colors[Math.floor(Math.random() * colors.length)];
+          el.style.fontSize = `${14 + Math.floor(Math.random() * 9)}px`;
+          el.style.setProperty('--tx', `${Math.cos(angle) * dist}px`);
+          el.style.setProperty('--ty', `${Math.sin(angle) * dist - 10}px`);
+          el.style.setProperty('--rot', `${(Math.random() - 0.5) * 90}deg`);
+          document.body.appendChild(el);
+          setTimeout(() => el.remove(), 700);
+        }
+      }
+
+      let lastAnimalReactTime = 0;
+      function reactAnimal(moveSomewhere = false) {
+        const now = Date.now();
+        if (now - lastAnimalReactTime < 120) return;
+        lastAnimalReactTime = now;
+
+        if (!animalBtn) return;
+        animalBtn.classList.remove('is-jumping');
+        void animalBtn.offsetWidth;
+        animalBtn.classList.add('is-jumping');
+
+        const rect = animalBtn.getBoundingClientRect();
+        spawnTapPopBurst(rect.left + rect.width / 2, rect.top + rect.height / 2);
+
+        if (moveSomewhere) {
+          const maxLeft = Math.max(16, window.innerWidth - 96);
+          const nextLeft = 16 + Math.random() * (maxLeft - 16);
+          animalBtn.style.left = `${nextLeft}px`;
+        }
+      }
+
+      animalBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        reactAnimal(true);
+        showNotice('ぴょこっ！うさみみアニマルが跳ねたよ💕');
+      });
+
+      animalBtn?.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        reactAnimal(true);
+        showNotice('ぴょこっ！うさみみアニマルが跳ねたよ💕');
+      }, { passive: true });
+
+      window.addEventListener('pointermove', (e) => {
+        if (Math.random() < 0.55) {
+          spawnCursorDust(e.clientX, e.clientY, 2);
+        }
+      });
+
+      window.addEventListener('pointerdown', (e) => {
+        spawnCursorDust(e.clientX, e.clientY, 12);
+        spawnTapRipple(e.clientX, e.clientY);
+        spawnTapPopBurst(e.clientX, e.clientY);
+        spawnLightStreak(2);
+      });
+
+      document.getElementById('btnBoostPulse')?.addEventListener('click', () => {
+        spawnLightStreak(7);
+        spawnTapRipple(width * 0.5, height * 0.35);
+        reactAnimal(false);
+        showNotice('⚡ ネオンパルスを放ちました！');
+      });
+
+      document.getElementById('btnPaletteShift')?.addEventListener('click', () => {
+        paletteIdx = (paletteIdx + 1) % PALETTES.length;
+        initPixelStars();
+        spawnLightStreak(5);
+        reactAnimal(false);
+        showNotice(`🎨 カラーテーマ: ${PALETTES[paletteIdx].name}`);
+      });
+
+      function animate(now) {
+        const t = now * 0.001;
+        const pal = PALETTES[paletteIdx];
+
+        ctx.fillStyle = '#060714';
+        ctx.fillRect(0, 0, width, height);
+
+        const a1x = width * 0.2 + Math.sin(t * 0.45) * 75;
+        const a1y = height * 0.24 + Math.cos(t * 0.35) * 55;
+        const g1 = ctx.createRadialGradient(a1x, a1y, 10, a1x, a1y, Math.max(width, height) * 0.5);
+        g1.addColorStop(0, pal.aurora1);
+        g1.addColorStop(1, 'transparent');
+        ctx.fillStyle = g1;
+        ctx.fillRect(0, 0, width, height);
+
+        const a2x = width * 0.8 + Math.cos(t * 0.4) * 80;
+        const a2y = height * 0.62 + Math.sin(t * 0.5) * 60;
+        const g2 = ctx.createRadialGradient(a2x, a2y, 10, a2x, a2y, Math.max(width, height) * 0.5);
+        g2.addColorStop(0, pal.aurora2);
+        g2.addColorStop(1, 'transparent');
+        ctx.fillStyle = g2;
+        ctx.fillRect(0, 0, width, height);
+
+        const a3x = width * 0.5 + Math.sin(t * 0.32) * 65;
+        const a3y = height * 0.88;
+        const g3 = ctx.createRadialGradient(a3x, a3y, 10, a3x, a3y, Math.max(width, height) * 0.45);
+        g3.addColorStop(0, pal.aurora3);
+        g3.addColorStop(1, 'transparent');
+        ctx.fillStyle = g3;
+        ctx.fillRect(0, 0, width, height);
+
+        const pulseAlpha = 0.85 + Math.sin(t * 1.8) * 0.15;
+        ctx.save();
+        ctx.globalAlpha = pulseAlpha;
+
+        for (let x = 0; x <= width; x += GRID_SIZE) {
+          const isMajor = (x / GRID_SIZE) % 4 === 0;
+          ctx.strokeStyle = isMajor ? pal.gridMajor : pal.grid;
+          ctx.lineWidth = isMajor ? 1.2 : 1;
+          ctx.beginPath();
+          ctx.moveTo(x + 0.5, 0);
+          ctx.lineTo(x + 0.5, height);
+          ctx.stroke();
+        }
+
+        for (let y = 0; y <= height; y += GRID_SIZE) {
+          const isMajor = (y / GRID_SIZE) % 4 === 0;
+          ctx.strokeStyle = isMajor ? pal.gridMajor : pal.grid;
+          ctx.lineWidth = isMajor ? 1.2 : 1;
+          ctx.beginPath();
+          ctx.moveTo(0, y + 0.5);
+          ctx.lineTo(width, y + 0.5);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        for (let i = 0; i < pixelStars.length; i++) {
+          const s = pixelStars[i];
+          s.phase += s.speed;
+          const alpha = 0.25 + ((Math.sin(s.phase) + 1) * 0.5) * 0.75;
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = s.color;
+          ctx.fillRect(s.x, s.y, s.size, s.size);
+          if (s.cross) {
+            ctx.fillRect(s.x - s.size, s.y + s.size * 0.5 - 1, s.size * 3, 2);
+            ctx.fillRect(s.x + s.size * 0.5 - 1, s.y - s.size, 2, s.size * 3);
+          }
+          ctx.restore();
+        }
+
+        if (Math.random() < 0.032 && lightStreaks.length < 10) {
+          spawnLightStreak(1);
+        }
+
+        for (let i = lightStreaks.length - 1; i >= 0; i--) {
+          const st = lightStreaks[i];
+          st.x += st.vx;
+          st.y += st.vy;
+
+          ctx.save();
+          ctx.strokeStyle = st.color;
+          ctx.lineWidth = 2.5;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = st.color;
+          ctx.beginPath();
+          if (st.horizontal) {
+            const sign = st.vx >= 0 ? -1 : 1;
+            ctx.moveTo(st.x, st.y + 0.5);
+            ctx.lineTo(st.x + sign * st.length, st.y + 0.5);
+          } else {
+            const sign = st.vy >= 0 ? -1 : 1;
+            ctx.moveTo(st.x + 0.5, st.y);
+            ctx.lineTo(st.x + 0.5, st.y + sign * st.length);
+          }
+          ctx.stroke();
+          ctx.restore();
+
+          if (st.x < -260 || st.x > width + 260 || st.y < -260 || st.y > height + 260) {
+            lightStreaks.splice(i, 1);
+          }
+        }
+
+        for (let i = tapRipples.length - 1; i >= 0; i--) {
+          const r = tapRipples[i];
+          r.radius += 4.2;
+          r.alpha *= 0.94;
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, r.alpha);
+          ctx.strokeStyle = r.color;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+
+          if (r.radius >= r.maxRadius || r.alpha < 0.02) {
+            tapRipples.splice(i, 1);
+          }
+        }
+
+        for (let i = cursorParticles.length - 1; i >= 0; i--) {
+          const p = cursorParticles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.96;
+          p.vy *= 0.96;
+          p.alpha -= 0.026;
+
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, p.alpha);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
+          ctx.restore();
+
+          if (p.alpha <= 0) {
+            cursorParticles.splice(i, 1);
+          }
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+      spawnLightStreak(3);
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>
