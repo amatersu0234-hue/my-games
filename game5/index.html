@@ -1,0 +1,2669 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ネオンナイト＊アニマルパーティー</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-1: #110926;
+      --bg-2: #1f1147;
+      --bg-3: #2e155c;
+      --neon-pink: #ff52d9;
+      --neon-cyan: #2cf6ff;
+      --neon-yellow: #ffe64d;
+      --neon-orange: #ff9447;
+      --neon-mint: #4dffb8;
+      --neon-purple: #be75ff;
+      --panel-bg: rgba(255, 255, 255, 0.09);
+      --panel-border: rgba(255, 255, 255, 0.24);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      touch-action: none;
+      font-family: 'M PLUS Rounded 1c', 'Fredoka', sans-serif;
+      background: radial-gradient(circle at 50% 15%, #2f1763 0%, #170c36 55%, #0c061f 100%);
+      color: #ffffff;
+    }
+
+    /* 背景キラキラパーティクル用Canvas */
+    #bgCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* メインレイアウト */
+    #app {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: max(8px, env(safe-area-inset-top)) 12px max(10px, env(safe-area-inset-bottom));
+    }
+
+    /* 上部HUD */
+    .hud-top {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      flex-shrink: 0;
+    }
+
+    .hud-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .score-cards {
+      display: flex;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .hud-card {
+      flex: 1;
+      background: var(--panel-bg);
+      border: 1.5px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 5px 12px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    .hud-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: #d6c4ff;
+      display: block;
+    }
+
+    .hud-val {
+      font-family: 'Fredoka', 'M PLUS Rounded 1c', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      line-height: 1.15;
+      color: #ffffff;
+      text-shadow: 0 0 10px rgba(44, 246, 255, 0.75);
+    }
+
+    .hud-card.best .hud-val {
+      color: var(--neon-yellow);
+      text-shadow: 0 0 10px rgba(255, 230, 77, 0.7);
+    }
+
+    .sound-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 15px;
+      border: 1.5px solid var(--panel-border);
+      background: var(--panel-bg);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+      transition: transform 0.12s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .sound-btn:hover {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 14px rgba(44, 246, 255, 0.5);
+    }
+
+    .sound-btn:active {
+      transform: scale(0.9);
+    }
+
+    .sound-btn.muted {
+      opacity: 0.52;
+    }
+
+    /* タイム＆フィーバーゲージ */
+    .gauge-box {
+      width: 100%;
+      background: var(--panel-bg);
+      border: 1.5px solid var(--panel-border);
+      border-radius: 18px;
+      padding: 7px 12px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+    }
+
+    .gauge-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+
+    .fever-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: rgba(255, 82, 217, 0.22);
+      border: 1px solid rgba(255, 82, 217, 0.65);
+      color: #ffa6ec;
+      text-shadow: 0 0 8px var(--neon-pink);
+      transition: all 0.2s ease;
+    }
+
+    .fever-pill.active {
+      background: linear-gradient(90deg, #ff52d9, #ffe64d, #2cf6ff, #ff52d9);
+      background-size: 200% 100%;
+      animation: rainbowMove 1.4s linear infinite;
+      color: #170a2e;
+      border-color: #ffffff;
+      text-shadow: none;
+      box-shadow: 0 0 16px rgba(255, 82, 217, 0.9);
+      transform: scale(1.04);
+    }
+
+    @keyframes rainbowMove {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+
+    .combo-mult {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.88rem;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 8px rgba(44, 246, 255, 0.85);
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 13px;
+      background: rgba(11, 5, 26, 0.72);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ff52d9 0%, #be75ff 50%, #2cf6ff 100%);
+      box-shadow: 0 0 14px rgba(44, 246, 255, 0.85);
+      transition: width 0.08s linear;
+      position: relative;
+    }
+
+    .bar-fill::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 6px;
+      right: 6px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.45);
+    }
+
+    .bar-fill.danger {
+      background: linear-gradient(90deg, #ff2a5f, #ff9447);
+      box-shadow: 0 0 16px rgba(255, 42, 95, 0.95);
+      animation: dangerPulse 0.45s ease-in-out infinite alternate;
+    }
+
+    .bar-fill.fever {
+      background: linear-gradient(90deg, #ff52d9, #ffe64d, #4dffb8, #2cf6ff, #ff52d9);
+      background-size: 200% 100%;
+      animation: rainbowMove 1s linear infinite;
+      box-shadow: 0 0 20px rgba(255, 230, 77, 0.95);
+    }
+
+    @keyframes dangerPulse {
+      from { opacity: 0.72; }
+      to { opacity: 1; }
+    }
+
+    /* パズル盤面エリア */
+    .stage-wrap {
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 0;
+    }
+
+    .board-frame {
+      position: relative;
+      padding: 8px;
+      border-radius: 28px;
+      background: linear-gradient(145deg, rgba(255, 82, 217, 0.28), rgba(44, 246, 255, 0.25));
+      border: 2.5px solid rgba(255, 255, 255, 0.3);
+      box-shadow:
+        0 14px 36px rgba(6, 2, 20, 0.72),
+        0 0 28px rgba(190, 117, 255, 0.4),
+        inset 0 0 20px rgba(255, 255, 255, 0.14);
+      transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    }
+
+    .board-frame.fever-glow {
+      border-color: #ffe64d;
+      box-shadow:
+        0 14px 40px rgba(6, 2, 20, 0.75),
+        0 0 42px rgba(255, 82, 217, 0.85),
+        0 0 22px rgba(255, 230, 77, 0.85);
+    }
+
+    #gameCanvas {
+      display: block;
+      border-radius: 22px;
+      background: rgba(15, 9, 36, 0.88);
+      cursor: pointer;
+    }
+
+    /* 下部ミニガイド */
+    .hud-bottom {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .mini-chip {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #e4d8ff;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+      padding: 3px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* スタート・リザルト オーバーレイ */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      background: rgba(12, 6, 30, 0.8);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      opacity: 1;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .card-modal {
+      width: 100%;
+      max-width: 420px;
+      max-height: 94vh;
+      overflow-y: auto;
+      background: linear-gradient(165deg, rgba(42, 24, 86, 0.95), rgba(20, 11, 46, 0.97));
+      border: 2px solid rgba(255, 255, 255, 0.28);
+      border-radius: 30px;
+      padding: 22px 20px;
+      text-align: center;
+      box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.7),
+        0 0 36px rgba(255, 82, 217, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      animation: modalPop 0.35s cubic-bezier(0.22, 1.25, 0.36, 1);
+    }
+
+    @keyframes modalPop {
+      from { transform: scale(0.86) translateY(14px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .sub-pill {
+      display: inline-block;
+      padding: 3px 13px;
+      border-radius: 999px;
+      background: rgba(44, 246, 255, 0.16);
+      border: 1px solid rgba(44, 246, 255, 0.55);
+      color: var(--neon-cyan);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+      text-shadow: 0 0 8px rgba(44, 246, 255, 0.7);
+    }
+
+    .main-title {
+      font-size: 1.65rem;
+      font-weight: 800;
+      line-height: 1.22;
+      margin-bottom: 10px;
+      background: linear-gradient(180deg, #ffffff 15%, #ffb0f0 58%, #ff52d9 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 14px rgba(255, 82, 217, 0.7));
+    }
+
+    .animal-parade {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin: 10px 0 14px;
+    }
+
+    .animal-parade canvas {
+      width: 46px;
+      height: 46px;
+      animation: bounceAnimal 1.8s ease-in-out infinite;
+    }
+
+    .animal-parade canvas:nth-child(2) { animation-delay: 0.15s; }
+    .animal-parade canvas:nth-child(3) { animation-delay: 0.30s; }
+    .animal-parade canvas:nth-child(4) { animation-delay: 0.45s; }
+    .animal-parade canvas:nth-child(5) { animation-delay: 0.60s; }
+    .animal-parade canvas:nth-child(6) { animation-delay: 0.75s; }
+
+    @keyframes bounceAnimal {
+      0%, 100% { transform: translateY(0) scale(1, 1); }
+      40% { transform: translateY(-7px) scale(0.95, 1.06); }
+      70% { transform: translateY(1px) scale(1.06, 0.94); }
+    }
+
+    .guide-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+      text-align: left;
+    }
+
+    .guide-item {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 14px;
+      padding: 8px 10px;
+      font-size: 0.74rem;
+      line-height: 1.35;
+      color: #f0eaff;
+    }
+
+    .guide-item strong {
+      display: block;
+      font-size: 0.78rem;
+      margin-bottom: 2px;
+      color: var(--neon-yellow);
+    }
+
+    .guide-item.helper strong {
+      color: var(--neon-cyan);
+    }
+
+    .best-line {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--neon-yellow);
+      margin-bottom: 14px;
+      text-shadow: 0 0 10px rgba(255, 230, 77, 0.6);
+    }
+
+    .bouncy-btn {
+      width: 100%;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 999px;
+      font-family: 'Fredoka', 'M PLUS Rounded 1c', sans-serif;
+      font-size: 1.22rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: #160a2c;
+      background: linear-gradient(90deg, #ff6be0 0%, #ffe64d 50%, #2cf6ff 100%);
+      background-size: 200% 100%;
+      box-shadow:
+        0 8px 24px rgba(255, 82, 217, 0.55),
+        0 0 20px rgba(44, 246, 255, 0.45),
+        inset 0 2px 0 rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      animation: rainbowMove 2.8s linear infinite;
+      transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .bouncy-btn:hover {
+      transform: scale(1.04) translateY(-2px);
+    }
+
+    .bouncy-btn:active {
+      transform: scale(0.94);
+    }
+
+    /* リザルト用 */
+    .record-tag {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ffe64d, #ff7366);
+      color: #1a0b2e;
+      font-size: 0.78rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+      box-shadow: 0 0 16px rgba(255, 230, 77, 0.85);
+    }
+
+    .record-tag.hidden {
+      display: none;
+    }
+
+    .final-score-panel {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1.5px solid rgba(44, 246, 255, 0.45);
+      border-radius: 20px;
+      padding: 14px;
+      margin: 12px 0;
+    }
+
+    .final-score-num {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #ffffff;
+      text-shadow: 0 0 18px rgba(44, 246, 255, 0.9);
+      line-height: 1.1;
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .result-cell {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 10px;
+    }
+
+    .result-cell .num {
+      font-family: 'Fredoka', 'M PLUS Rounded 1c', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--neon-pink);
+      text-shadow: 0 0 8px rgba(255, 82, 217, 0.65);
+    }
+
+    .result-cell.best .num {
+      color: var(--neon-yellow);
+      text-shadow: 0 0 8px rgba(255, 230, 77, 0.65);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="bgCanvas"></canvas>
+
+  <div id="app">
+    <header class="hud-top">
+      <div class="hud-row">
+        <div class="score-cards">
+          <div class="hud-card">
+            <span class="hud-label">SCORE</span>
+            <span class="hud-val" id="scoreVal">0</span>
+          </div>
+          <div class="hud-card best">
+            <span class="hud-label">BEST</span>
+            <span class="hud-val" id="bestVal">0</span>
+          </div>
+        </div>
+        <button class="sound-btn" id="soundBtn" aria-label="サウンド切替" title="BGM / SE オン・オフ">
+          <svg id="iconSoundOn" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          </svg>
+          <svg id="iconSoundOff" style="display:none;" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="gauge-box">
+        <div class="gauge-header">
+          <span class="fever-pill" id="feverPill">✨ FEVER 0%</span>
+          <span class="combo-mult" id="multVal">x1.0</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" id="energyFill"></div>
+        </div>
+      </div>
+    </header>
+
+    <main class="stage-wrap" id="stageWrap">
+      <div class="board-frame" id="boardFrame">
+        <canvas id="gameCanvas"></canvas>
+      </div>
+    </main>
+
+    <footer class="hud-bottom">
+      <span class="mini-chip">🫧 ゼリー殻:隣で割れる</span>
+      <span class="mini-chip">💤 おやすみ:隣で揃えて消去</span>
+      <span class="mini-chip">💖 5消し:同色全消し</span>
+    </footer>
+  </div>
+
+  <!-- タイトル画面 -->
+  <div class="overlay" id="startOverlay">
+    <div class="card-modal">
+      <div class="sub-pill">✨ PUNI-PUNI NEON MATCH 3 ✨</div>
+      <h1 class="main-title">ネオンナイト＊<br>アニマルパーティー</h1>
+
+      <div class="animal-parade" id="animalParade"></div>
+
+      <div class="guide-grid">
+        <div class="guide-item helper">
+          <strong>⚡ スターライン（4消し）</strong>
+          縦か横1列をネオンビームで一掃！
+        </div>
+        <div class="guide-item helper">
+          <strong>💥 ネオンボム（L/T消し）</strong>
+          周囲3×3を爆破！殻も一発破壊！
+        </div>
+        <div class="guide-item helper">
+          <strong>💖 レインボーハート（5消し）</strong>
+          スライドした色のアニマルを全消去！
+        </div>
+        <div class="guide-item">
+          <strong>🫧 ゼリー殻 ＆ 💤 おやすみ</strong>
+          殻は隣で消すとパリン！眠り子は隣で揃えて起こそう！
+        </div>
+      </div>
+
+      <div class="best-line">👑 BEST SCORE: <span id="startBestVal">0</span></div>
+      <button class="bouncy-btn" id="startBtn">START ✨</button>
+    </div>
+  </div>
+
+  <!-- リザルト画面 -->
+  <div class="overlay hidden" id="resultOverlay">
+    <div class="card-modal">
+      <div class="record-tag hidden" id="newRecordTag">🎉 NEW HIGH SCORE! 🎉</div>
+      <div class="sub-pill">PARTY TIME UP!</div>
+      <h2 class="main-title" style="font-size: 1.6rem;">STAGE RESULT</h2>
+
+      <div class="final-score-panel">
+        <span class="hud-label" style="margin-bottom: 4px;">FINAL SCORE</span>
+        <div class="final-score-num" id="resScore">0</div>
+      </div>
+
+      <div class="result-grid">
+        <div class="result-cell best">
+          <span class="hud-label">BEST SCORE</span>
+          <div class="num" id="resBest">0</div>
+        </div>
+        <div class="result-cell">
+          <span class="hud-label">MAX COMBO</span>
+          <div class="num" id="resCombo">0 COMBO</div>
+        </div>
+      </div>
+
+      <button class="bouncy-btn" id="retryBtn">PLAY AGAIN 🔄</button>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ============================================================================
+     * ネオンナイト＊アニマルパーティー (Neon Night * Animal Party)
+     * ぷにぷにネオンアニマル × お邪魔＆お助けピース × キラキラコンボ演出
+     * ============================================================================
+     */
+
+    // ============================================================================
+    // 1. 可愛いオルゴール＆ピコピコ・サウンドエンジン (Web Audio API)
+    // ============================================================================
+    class CuteNeonAudio {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+        this.bgmTimer = null;
+        this.step = 0;
+        this.playing = false;
+
+        // 明るく跳ねるパレード調の可愛いメロディ（Fメジャー / Cメジャー進行）
+        const N = {
+          C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, B4: 493.88,
+          C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00, B5: 987.77,
+          C6: 1046.50, D6: 1174.66, E6: 1318.51, R: 0
+        };
+
+        this.melody = [
+          N.G5, N.E5, N.C5, N.E5,  N.G5, N.R,  N.A5, N.G5,
+          N.E5, N.C5, N.D5, N.E5,  N.D5, N.R,  N.R,  N.R,
+          N.F5, N.D5, N.B4, N.D5,  N.F5, N.R,  N.G5, N.F5,
+          N.E5, N.C5, N.D5, N.B4,  N.C5, N.R,  N.R,  N.R,
+          N.A5, N.R,  N.G5, N.E5,  N.C6, N.R,  N.B5, N.G5,
+          N.A5, N.G5, N.E5, N.C5,  N.D5, N.R,  N.E5, N.R,
+          N.F5, N.A5, N.G5, N.E5,  N.D5, N.F5, N.E5, N.D5,
+          N.C5, N.E5, N.G5, N.B5,  N.C6, N.R,  N.R,  N.R
+        ];
+
+        this.bass = [
+          N.C4, N.R,  N.G4, N.R,   N.C4, N.R,  N.E4, N.R,
+          N.A4, N.R,  N.E4, N.R,   N.G4, N.R,  N.D4, N.R,
+          N.D4, N.R,  N.G4, N.R,   N.B4, N.R,  N.G4, N.R,
+          N.C4, N.R,  N.G4, N.R,   N.C4, N.R,  N.R,  N.R,
+          N.F4, N.R,  N.C4, N.R,   N.E4, N.R,  N.C4, N.R,
+          N.F4, N.R,  N.C4, N.R,   N.G4, N.R,  N.D4, N.R,
+          N.D4, N.R,  N.G4, N.R,   N.G4, N.R,  N.B4, N.R,
+          N.C4, N.R,  N.G4, N.R,   N.C4, N.R,  N.R,  N.R
+        ];
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioCtx();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        if (this.muted) {
+          this.stopBgm();
+        } else if (this.playing) {
+          this.startBgm();
+        }
+        return this.muted;
+      }
+
+      tone(freq, dur, type = 'sine', vol = 0.07, delay = 0) {
+        if (this.muted || !this.ctx || freq <= 0) return;
+        const now = this.ctx.currentTime + delay;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(vol, now + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + dur + 0.02);
+      }
+
+      startBgm() {
+        this.playing = true;
+        if (this.muted) return;
+        this.init();
+        if (this.bgmTimer) clearInterval(this.bgmTimer);
+
+        this.bgmTimer = setInterval(() => {
+          if (this.muted || !this.playing) return;
+          const idx = this.step % this.melody.length;
+          const m = this.melody[idx];
+          const b = this.bass[idx];
+
+          if (m > 0) {
+            this.tone(m, 0.3, 'sine', 0.06);
+            this.tone(m * 2, 0.16, 'triangle', 0.02);
+          }
+          if (b > 0) {
+            this.tone(b * 0.5, 0.22, 'triangle', 0.05);
+          }
+          this.step++;
+        }, 145);
+      }
+
+      stopBgm() {
+        if (this.bgmTimer) {
+          clearInterval(this.bgmTimer);
+          this.bgmTimer = null;
+        }
+      }
+
+      // ぷにっ！と触った音
+      playSquish() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(420, now);
+        osc.frequency.exponentialRampToValueAtTime(760, now + 0.09);
+        gain.gain.setValueAtTime(0.09, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.11);
+      }
+
+      // 眠っていて動かせない音（むにゃっ）
+      playSleepy() {
+        if (this.muted) return;
+        this.init();
+        this.tone(330, 0.12, 'sine', 0.07, 0);
+        this.tone(293.66, 0.16, 'sine', 0.07, 0.09);
+      }
+
+      // 無効スワップ戻り音（ぽよん）
+      playBounceBack() {
+        if (this.muted) return;
+        this.init();
+        this.tone(280, 0.11, 'triangle', 0.08, 0);
+        this.tone(210, 0.14, 'triangle', 0.08, 0.07);
+      }
+
+      // コンボ消去音（連鎖ごとに音階がキラキラ上昇）
+      playComboMatch(combo = 1, madeHelper = false) {
+        if (this.muted) return;
+        this.init();
+        const scale = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1174.66, 1318.51, 1567.98, 1760.00];
+        const root = scale[Math.min(combo - 1, scale.length - 1)];
+
+        this.tone(root, 0.24, 'sine', 0.11, 0);
+        this.tone(root * 1.25, 0.26, 'triangle', 0.08, 0.04);
+        this.tone(root * 1.5, 0.34, 'sine', 0.09, 0.08);
+
+        if (madeHelper) {
+          this.tone(1318.51, 0.3, 'sine', 0.09, 0.11);
+          this.tone(1975.53, 0.42, 'triangle', 0.08, 0.16);
+        }
+      }
+
+      // ゼリー殻がパリン！と割れる音
+      playJellyBreak() {
+        if (this.muted) return;
+        this.init();
+        this.tone(1200, 0.08, 'triangle', 0.08, 0);
+        this.tone(1680, 0.12, 'sine', 0.08, 0.03);
+      }
+
+      // お助けピース爆発・ビーム・レインボー発動音
+      playHelperBurst(kind = 'bomb') {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        if (kind === 'rainbow') {
+          [523.25, 659.25, 783.99, 1046.5, 1318.5, 1568.0, 2093.0].forEach((f, i) => {
+            this.tone(f, 0.32, 'sine', 0.08, i * 0.035);
+          });
+        } else {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(kind === 'line' ? 520 : 190, now);
+          osc.frequency.exponentialRampToValueAtTime(48, now + 0.3);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.34);
+
+          [1046.5, 1318.5, 1568.0].forEach((f, i) => {
+            this.tone(f, 0.22, 'sine', 0.07, i * 0.04);
+          });
+        }
+      }
+
+      // フィーバー突入ファンファーレ
+      playFever() {
+        if (this.muted) return;
+        this.init();
+        [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98].forEach((f, i) => {
+          this.tone(f, 0.32, 'triangle', 0.09, i * 0.05);
+        });
+      }
+
+      // タイムアップ音
+      playGameOver() {
+        if (this.muted) return;
+        this.init();
+        [659.25, 587.33, 523.25, 392.00].forEach((f, i) => {
+          this.tone(f, 0.34, 'sine', 0.09, i * 0.13);
+        });
+      }
+    }
+
+    // ============================================================================
+    // 2. 6種類のぷにぷにネオンアニマル描画エンジン
+    // ============================================================================
+    const ANIMALS = [
+      {
+        id: 0,
+        key: 'rabbit',
+        name: 'うさぎ',
+        main: '#ff52d9',
+        light: '#ffc4f2',
+        dark: '#b3148f',
+        glow: 'rgba(255, 82, 217, 0.85)',
+        cheek: '#ff94e6'
+      },
+      {
+        id: 1,
+        key: 'cat',
+        name: 'ねこ',
+        main: '#ffe64d',
+        light: '#fff9c4',
+        dark: '#c29200',
+        glow: 'rgba(255, 230, 77, 0.85)',
+        cheek: '#ff9e66'
+      },
+      {
+        id: 2,
+        key: 'bear',
+        name: 'くま',
+        main: '#ff9447',
+        light: '#ffd8b8',
+        dark: '#b84700',
+        glow: 'rgba(255, 148, 71, 0.85)',
+        cheek: '#ff6e6e'
+      },
+      {
+        id: 3,
+        key: 'chick',
+        name: 'ひよこ',
+        main: '#4dffb8',
+        light: '#ccffeb',
+        dark: '#00995c',
+        glow: 'rgba(77, 255, 184, 0.85)',
+        cheek: '#ff94b8'
+      },
+      {
+        id: 4,
+        key: 'slime',
+        name: 'おばけスライム',
+        main: '#2cf6ff',
+        light: '#c9fcff',
+        dark: '#008ca3',
+        glow: 'rgba(44, 246, 255, 0.85)',
+        cheek: '#ff8ce6'
+      },
+      {
+        id: 5,
+        key: 'panda',
+        name: 'パンダ',
+        main: '#be75ff',
+        light: '#ebd4ff',
+        dark: '#661db8',
+        glow: 'rgba(190, 117, 255, 0.85)',
+        cheek: '#ff8ce6'
+      }
+    ];
+
+    /**
+     * ぷっくりグミ質感のネオンアニマルを描画
+     * opts: { helper: null|'row'|'col'|'bomb'|'rainbow', jelly: boolean, sleepy: boolean, time: number }
+     */
+    function drawPuniAnimal(ctx, typeId, cx, cy, radius, opts = {}) {
+      const { helper = null, jelly = false, sleepy = false, time = 0 } = opts;
+      ctx.save();
+      ctx.translate(cx, cy);
+
+      // レインボーハート（5消しお助けピース）は専用七色ハートデザイン
+      if (helper === 'rainbow') {
+        drawRainbowHeart(ctx, radius, time);
+        if (jelly) drawJellyShellOverlay(ctx, radius, time);
+        ctx.restore();
+        return;
+      }
+
+      const a = ANIMALS[typeId];
+      if (!a) {
+        ctx.restore();
+        return;
+      }
+
+      const r = radius * 0.84;
+
+      // ライン・ボムお助けオーラリング
+      if (helper === 'row' || helper === 'col' || helper === 'bomb') {
+        const pulse = 1 + Math.sin(time * 9) * 0.08;
+        ctx.save();
+        ctx.scale(pulse, pulse);
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 1.04, 0, Math.PI * 2);
+        ctx.strokeStyle = helper === 'bomb' ? '#ffffff' : a.light;
+        ctx.lineWidth = 2.6;
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 14;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // おやすみ状態は少しだけネオン光を落ち着かせる
+      ctx.shadowColor = sleepy ? 'rgba(160, 150, 220, 0.45)' : a.glow;
+      ctx.shadowBlur = sleepy ? 7 : 15;
+
+      // ぷっくり立体グミグラデーション
+      const bodyGrad = ctx.createRadialGradient(
+        -r * 0.32, -r * 0.36, r * 0.08,
+        0, r * 0.08, r * 1.15
+      );
+      bodyGrad.addColorStop(0, a.light);
+      bodyGrad.addColorStop(0.48, a.main);
+      bodyGrad.addColorStop(1, a.dark);
+
+      ctx.fillStyle = bodyGrad;
+      ctx.strokeStyle = sleepy ? 'rgba(220, 215, 255, 0.55)' : 'rgba(255, 255, 255, 0.85)';
+      ctx.lineWidth = 1.8;
+
+      // 1) 耳・トサカなどの特徴パーツ描画
+      ctx.beginPath();
+      if (a.key === 'rabbit') {
+        // 長い垂れ・立ちうさ耳
+        ctx.ellipse(-r * 0.34, -r * 0.86, r * 0.21, r * 0.44, -0.18, 0, Math.PI * 2);
+        ctx.ellipse(r * 0.34, -r * 0.86, r * 0.21, r * 0.44, 0.18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else if (a.key === 'cat') {
+        // 三角ねこ耳
+        ctx.moveTo(-r * 0.78, -r * 0.25);
+        ctx.lineTo(-r * 0.62, -r * 0.98);
+        ctx.lineTo(-r * 0.12, -r * 0.68);
+        ctx.closePath();
+        ctx.moveTo(r * 0.78, -r * 0.25);
+        ctx.lineTo(r * 0.62, -r * 0.98);
+        ctx.lineTo(r * 0.12, -r * 0.68);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else if (a.key === 'bear' || a.key === 'panda') {
+        // 丸いくま・パンダ耳
+        ctx.arc(-r * 0.62, -r * 0.66, r * 0.28, 0, Math.PI * 2);
+        ctx.arc(r * 0.62, -r * 0.66, r * 0.28, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else if (a.key === 'chick') {
+        // ちょこんと頭の上の羽根トサカ
+        ctx.ellipse(-r * 0.1, -r * 0.92, r * 0.14, r * 0.24, -0.35, 0, Math.PI * 2);
+        ctx.ellipse(r * 0.12, -r * 0.92, r * 0.14, r * 0.24, 0.35, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // 2) ぷっくり顔の輪郭
+      ctx.beginPath();
+      if (a.key === 'slime') {
+        // おばけスライム（しずく型ぽってりボディ）
+        ctx.moveTo(0, -r * 0.98);
+        ctx.bezierCurveTo(r * 0.55, -r * 0.55, r * 0.98, -r * 0.05, r * 0.92, r * 0.45);
+        ctx.bezierCurveTo(r * 0.86, r * 0.88, -r * 0.86, r * 0.88, -r * 0.92, r * 0.45);
+        ctx.bezierCurveTo(-r * 0.98, -r * 0.05, -r * 0.55, -r * 0.55, 0, -r * 0.98);
+      } else {
+        // ほっぺぷっくり丸顔
+        ctx.ellipse(0, r * 0.06, r * 0.88, r * 0.80, 0, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+
+      // 内側のツヤ感ハイライト（ゼリーのような光沢）
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.30, -r * 0.28, r * 0.25, r * 0.12, -0.55, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+      ctx.fill();
+
+      // 3) 動物ごとの顔パーツ
+      const faceY = a.key === 'slime' ? r * 0.18 : r * 0.08;
+
+      // パンダの垂れ目パッチ
+      if (a.key === 'panda') {
+        ctx.fillStyle = 'rgba(34, 14, 64, 0.78)';
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.34, faceY - r * 0.02, r * 0.21, r * 0.16, -0.35, 0, Math.PI * 2);
+        ctx.ellipse(r * 0.34, faceY - r * 0.02, r * 0.21, r * 0.16, 0.35, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // くまの口元マズル
+      if (a.key === 'bear') {
+        ctx.fillStyle = 'rgba(255, 245, 230, 0.85)';
+        ctx.beginPath();
+        ctx.ellipse(0, faceY + r * 0.20, r * 0.28, r * 0.20, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // ほっぺのチーク
+      ctx.fillStyle = a.cheek;
+      ctx.globalAlpha = sleepy ? 0.45 : 0.75;
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.48, faceY + r * 0.14, r * 0.14, r * 0.09, 0, 0, Math.PI * 2);
+      ctx.ellipse(r * 0.48, faceY + r * 0.14, r * 0.14, r * 0.09, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // 目（おやすみ中はスヤスヤ閉じ目、通常はウルウルお目々）
+      if (sleepy) {
+        ctx.strokeStyle = '#241242';
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(-r * 0.31, faceY - r * 0.02, r * 0.13, 0.15 * Math.PI, 0.85 * Math.PI);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(r * 0.31, faceY - r * 0.02, r * 0.13, 0.15 * Math.PI, 0.85 * Math.PI);
+        ctx.stroke();
+      } else {
+        // ぱっちり黒目＋白いキャッチライト
+        ctx.fillStyle = '#231040';
+        ctx.beginPath();
+        ctx.arc(-r * 0.31, faceY - r * 0.03, r * 0.11, 0, Math.PI * 2);
+        ctx.arc(r * 0.31, faceY - r * 0.03, r * 0.11, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(-r * 0.34, faceY - r * 0.06, r * 0.042, 0, Math.PI * 2);
+        ctx.arc(r * 0.28, faceY - r * 0.06, r * 0.042, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // お口＆お鼻
+      ctx.strokeStyle = '#231040';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+
+      if (a.key === 'chick') {
+        // ひよこの黄色い小さなくちばし
+        ctx.fillStyle = '#ffcf33';
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.13, faceY + r * 0.10);
+        ctx.lineTo(r * 0.13, faceY + r * 0.10);
+        ctx.lineTo(0, faceY + r * 0.25);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        // 小さなお鼻と「ω」にっこり口
+        ctx.fillStyle = '#231040';
+        ctx.beginPath();
+        ctx.arc(0, faceY + r * 0.08, r * 0.06, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(-r * 0.09, faceY + r * 0.16, r * 0.09, 0, Math.PI * 0.85);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(r * 0.09, faceY + r * 0.16, r * 0.09, Math.PI * 0.15, Math.PI);
+        ctx.stroke();
+      }
+
+      // ねこのおひげ
+      if (a.key === 'cat') {
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.56, faceY + r * 0.04);
+        ctx.lineTo(-r * 0.78, faceY);
+        ctx.moveTo(-r * 0.56, faceY + r * 0.14);
+        ctx.lineTo(-r * 0.78, faceY + r * 0.18);
+        ctx.moveTo(r * 0.56, faceY + r * 0.04);
+        ctx.lineTo(r * 0.78, faceY);
+        ctx.moveTo(r * 0.56, faceY + r * 0.14);
+        ctx.lineTo(r * 0.78, faceY + r * 0.18);
+        ctx.stroke();
+      }
+
+      // 4) お助けピース装飾（スターライン／ネオンボム）
+      if (helper === 'row' || helper === 'col') {
+        drawLineHelperOverlay(ctx, r, helper === 'col', time);
+      } else if (helper === 'bomb') {
+        drawBombHelperOverlay(ctx, r, time);
+      }
+
+      // 5) お邪魔1：ネオンゼリー殻（半透明カプセル）
+      if (jelly) {
+        drawJellyShellOverlay(ctx, radius, time);
+      }
+
+      // 6) お邪魔2：おやすみピースのふわふわ「Zzz」
+      if (sleepy) {
+        drawSleepyZzz(ctx, r, time);
+      }
+
+      ctx.restore();
+    }
+
+    // スターライン（縦・横ビーム矢印装飾）
+    function drawLineHelperOverlay(ctx, r, isVertical, time) {
+      ctx.save();
+      if (isVertical) ctx.rotate(Math.PI / 2);
+      const slide = Math.sin(time * 8) * 2.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3.2;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = '#2cf6ff';
+      ctx.shadowBlur = 12;
+
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.92 - slide, 0);
+      ctx.lineTo(-r * 0.62 - slide, -r * 0.24);
+      ctx.moveTo(-r * 0.92 - slide, 0);
+      ctx.lineTo(-r * 0.62 - slide, r * 0.24);
+
+      ctx.moveTo(r * 0.92 + slide, 0);
+      ctx.lineTo(r * 0.62 + slide, -r * 0.24);
+      ctx.moveTo(r * 0.92 + slide, 0);
+      ctx.lineTo(r * 0.62 + slide, r * 0.24);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // ネオンボム装飾（キラキラ爆弾エンブレム）
+    function drawBombHelperOverlay(ctx, r, time) {
+      ctx.save();
+      ctx.translate(r * 0.56, -r * 0.54);
+      const pulse = 1 + Math.sin(time * 12) * 0.16;
+      ctx.scale(pulse, pulse);
+
+      ctx.fillStyle = '#ff2a5f';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#ffe64d';
+      ctx.shadowBlur = 12;
+
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // 火花スパーク
+      ctx.rotate(time * 4);
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.22, 0);
+      ctx.lineTo(r * 0.22, 0);
+      ctx.moveTo(0, -r * 0.22);
+      ctx.lineTo(0, r * 0.22);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // レインボーハート（5消しお助けピース）
+    function drawRainbowHeart(ctx, radius, time) {
+      const r = radius * 0.88;
+      const hue = (time * 140) % 360;
+      const pulse = 1 + Math.sin(time * 7) * 0.06;
+
+      ctx.save();
+      ctx.scale(pulse, pulse);
+      ctx.shadowColor = `hsl(${hue}, 100%, 65%)`;
+      ctx.shadowBlur = 18;
+
+      const grad = ctx.createLinearGradient(-r, -r, r, r);
+      grad.addColorStop(0, `hsl(${hue}, 100%, 68%)`);
+      grad.addColorStop(0.33, `hsl(${(hue + 90) % 360}, 100%, 65%)`);
+      grad.addColorStop(0.66, `hsl(${(hue + 180) % 360}, 100%, 65%)`);
+      grad.addColorStop(1, `hsl(${(hue + 270) % 360}, 100%, 68%)`);
+
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.4;
+
+      ctx.beginPath();
+      const topY = -r * 0.34;
+      ctx.moveTo(0, r * 0.88);
+      ctx.bezierCurveTo(-r * 1.18, r * 0.16, -r * 0.96, -r * 0.88, 0, topY);
+      ctx.bezierCurveTo(r * 0.96, -r * 0.88, r * 1.18, r * 0.16, 0, r * 0.88);
+      ctx.fill();
+      ctx.stroke();
+
+      // 中央のキラキラ星
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, r * 0.12, r * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+
+      // ツヤ光沢
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.32, -r * 0.25, r * 0.2, r * 0.1, -0.6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // ネオンゼリー殻（お邪魔1：半透明のぷるぷるカプセル）
+    function drawJellyShellOverlay(ctx, radius, time) {
+      const r = radius * 0.94;
+      const wobble = Math.sin(time * 5) * 0.03;
+      ctx.save();
+      ctx.scale(1 + wobble, 1 - wobble);
+
+      const shellGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+      shellGrad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
+      shellGrad.addColorStop(0.65, 'rgba(44, 246, 255, 0.22)');
+      shellGrad.addColorStop(1, 'rgba(180, 252, 255, 0.58)');
+
+      ctx.fillStyle = shellGrad;
+      ctx.strokeStyle = '#9efcff';
+      ctx.lineWidth = 2.4;
+      ctx.shadowColor = '#2cf6ff';
+      ctx.shadowBlur = 10;
+
+      ctx.beginPath();
+      ctx.roundRect(-r * 0.92, -r * 0.92, r * 1.84, r * 1.84, r * 0.55);
+      ctx.fill();
+      ctx.stroke();
+
+      // ゼリーのぷるん光沢ライン
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(-r * 0.35, -r * 0.35, r * 0.36, Math.PI * 1.05, Math.PI * 1.45);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // おやすみZzzアニメーション（お邪魔2）
+    function drawSleepyZzz(ctx, r, time) {
+      ctx.save();
+      const floatY = Math.sin(time * 4) * 3;
+      ctx.font = `800 ${Math.max(10, Math.round(r * 0.42))}px 'Fredoka', sans-serif`;
+      ctx.fillStyle = '#d4b8ff';
+      ctx.strokeStyle = '#1b0c38';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#be75ff';
+      ctx.shadowBlur = 8;
+
+      ctx.strokeText('Zzz', r * 0.22, -r * 0.42 + floatY);
+      ctx.fillText('Zzz', r * 0.22, -r * 0.42 + floatY);
+      ctx.restore();
+    }
+
+    // ============================================================================
+    // 3. 背景の夜空ネオンスター＆パーティクル
+    // ============================================================================
+    class NightPartyBackground {
+      constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.stars = [];
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        for (let i = 0; i < 45; i++) {
+          this.stars.push(this.makeStar(true));
+        }
+      }
+
+      resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        this.canvas.width = window.innerWidth * dpr;
+        this.canvas.height = window.innerHeight * dpr;
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      makeStar(randomY = false) {
+        const palette = ['#ff52d9', '#2cf6ff', '#ffe64d', '#be75ff', '#4dffb8'];
+        return {
+          x: Math.random() * window.innerWidth,
+          y: randomY ? Math.random() * window.innerHeight : window.innerHeight + 16,
+          size: 1.8 + Math.random() * 3.4,
+          vy: 0.22 + Math.random() * 0.55,
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.03 + Math.random() * 0.04,
+          color: palette[Math.floor(Math.random() * palette.length)],
+          isDiamond: Math.random() > 0.55
+        };
+      }
+
+      render() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        this.ctx.clearRect(0, 0, w, h);
+
+        for (const s of this.stars) {
+          s.y -= s.vy;
+          s.phase += s.speed;
+          if (s.y < -20) Object.assign(s, this.makeStar(false));
+
+          const alpha = 0.28 + 0.52 * Math.sin(s.phase);
+          this.ctx.save();
+          this.ctx.globalAlpha = Math.max(0.1, alpha);
+          this.ctx.fillStyle = s.color;
+          this.ctx.shadowColor = s.color;
+          this.ctx.shadowBlur = 10;
+          this.ctx.translate(s.x, s.y);
+
+          if (s.isDiamond) {
+            this.ctx.rotate(Math.PI / 4);
+            this.ctx.fillRect(-s.size, -s.size, s.size * 2, s.size * 2);
+          } else {
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, s.size, 0, Math.PI * 2);
+            this.ctx.fill();
+          }
+          this.ctx.restore();
+        }
+      }
+    }
+
+    // ============================================================================
+    // 4. メイン・マッチ3パズルゲーム本体
+    // ============================================================================
+    class AnimalPartyMatch3 {
+      constructor() {
+        this.ROWS = 7;
+        this.COLS = 7;
+        this.NUM_ANIMALS = ANIMALS.length;
+
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.stageWrap = document.getElementById('stageWrap');
+        this.boardFrame = document.getElementById('boardFrame');
+
+        // DOM要素
+        this.scoreVal = document.getElementById('scoreVal');
+        this.bestVal = document.getElementById('bestVal');
+        this.startBestVal = document.getElementById('startBestVal');
+        this.feverPill = document.getElementById('feverPill');
+        this.multVal = document.getElementById('multVal');
+        this.energyFill = document.getElementById('energyFill');
+
+        this.startOverlay = document.getElementById('startOverlay');
+        this.resultOverlay = document.getElementById('resultOverlay');
+        this.resScore = document.getElementById('resScore');
+        this.resBest = document.getElementById('resBest');
+        this.resCombo = document.getElementById('resCombo');
+        this.newRecordTag = document.getElementById('newRecordTag');
+
+        this.audio = new CuteNeonAudio();
+
+        // ゲーム状態
+        this.grid = [];
+        this.state = 'MENU'; // MENU, IDLE, BUSY, GAMEOVER
+        this.score = 0;
+        this.bestScore = parseInt(localStorage.getItem('neonAnimalPartyBest') || '0', 10);
+        this.combo = 0;
+        this.maxCombo = 0;
+
+        // エネルギー＆フィーバー
+        this.maxEnergy = 100;
+        this.energy = 100;
+        this.feverCharge = 0;
+        this.isFever = false;
+        this.feverTimer = 0;
+        this.nextObstacleScore = 1800; // スコアに応じてお邪魔が少しずつ登場
+
+        // キラキラ・演出用リスト
+        this.sparkles = [];
+        this.floatTexts = [];
+        this.beams = [];
+        this.shakeTime = 0;
+        this.shakeAmp = 0;
+
+        // 入力状態
+        this.selected = null;
+        this.dragInfo = null;
+        this.lastSwappedCells = null;
+
+        this.cellSize = 48;
+        this.boardPx = 336;
+        this.time = 0;
+
+        this.buildStartParade();
+        this.bindInputs();
+        this.syncBestUI();
+        this.resize();
+        this.createInitialBoard();
+      }
+
+      buildStartParade() {
+        const box = document.getElementById('animalParade');
+        box.innerHTML = '';
+        for (let i = 0; i < this.NUM_ANIMALS; i++) {
+          const c = document.createElement('canvas');
+          c.width = 92;
+          c.height = 92;
+          const ctx = c.getContext('2d');
+          drawPuniAnimal(ctx, i, 46, 48, 34, { time: i });
+          box.appendChild(c);
+        }
+      }
+
+      syncBestUI() {
+        this.bestVal.textContent = this.bestScore.toLocaleString();
+        this.startBestVal.textContent = this.bestScore.toLocaleString();
+      }
+
+      resize() {
+        const rect = this.stageWrap.getBoundingClientRect();
+        const maxW = Math.min(rect.width - 20, 460);
+        const maxH = Math.min(rect.height - 16, 460);
+        const size = Math.max(245, Math.floor(Math.min(maxW, maxH) / this.COLS) * this.COLS);
+
+        this.boardPx = size;
+        this.cellSize = size / this.COLS;
+
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        this.canvas.width = size * dpr;
+        this.canvas.height = size * dpr;
+        this.canvas.style.width = `${size}px`;
+        this.canvas.style.height = `${size}px`;
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        if (this.grid.length > 0) {
+          for (let r = 0; r < this.ROWS; r++) {
+            for (let c = 0; c < this.COLS; c++) {
+              const cell = this.grid[r][c];
+              if (cell) {
+                cell.targetX = c * this.cellSize + this.cellSize / 2;
+                cell.targetY = r * this.cellSize + this.cellSize / 2;
+                if (this.state === 'IDLE' || this.state === 'MENU') {
+                  cell.x = cell.targetX;
+                  cell.y = cell.targetY;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      bindInputs() {
+        window.addEventListener('resize', () => this.resize());
+
+        const soundBtn = document.getElementById('soundBtn');
+        soundBtn.addEventListener('click', () => {
+          this.audio.init();
+          const muted = this.audio.toggleMute();
+          soundBtn.classList.toggle('muted', muted);
+          document.getElementById('iconSoundOn').style.display = muted ? 'none' : 'block';
+          document.getElementById('iconSoundOff').style.display = muted ? 'block' : 'none';
+        });
+
+        document.getElementById('startBtn').addEventListener('click', () => this.startNewGame());
+        document.getElementById('retryBtn').addEventListener('click', () => this.startNewGame());
+
+        const toCell = (clientX, clientY) => {
+          const rect = this.canvas.getBoundingClientRect();
+          const x = clientX - rect.left;
+          const y = clientY - rect.top;
+          return {
+            x,
+            y,
+            r: Math.floor(y / this.cellSize),
+            c: Math.floor(x / this.cellSize)
+          };
+        };
+
+        const handleDown = (clientX, clientY) => {
+          if (this.state !== 'IDLE') return;
+          this.audio.init();
+          const pos = toCell(clientX, clientY);
+          if (pos.r < 0 || pos.r >= this.ROWS || pos.c < 0 || pos.c >= this.COLS) return;
+
+          const cell = this.grid[pos.r][pos.c];
+          if (!cell) return;
+
+          // 触った瞬間に「ぽよん」と弾む物理スプリングを与える
+          this.triggerSquish(cell, 0.24);
+
+          // おやすみピースは自分からは動かせない
+          if (cell.sleepy) {
+            this.audio.playSleepy();
+            this.floatTexts.push({
+              text: 'Zzz... 💤',
+              x: cell.x,
+              y: cell.y - 16,
+              color: '#d4b8ff',
+              scale: 0.95,
+              life: 0.9
+            });
+            return;
+          }
+
+          this.dragInfo = pos;
+
+          // すでに選択済みの隣接セルをタップした場合は即スワップ
+          if (this.selected) {
+            const dr = Math.abs(this.selected.r - pos.r);
+            const dc = Math.abs(this.selected.c - pos.c);
+            if (dr + dc === 1) {
+              const from = { ...this.selected };
+              this.selected = null;
+              this.dragInfo = null;
+              this.attemptSwap(from.r, from.c, pos.r, pos.c);
+              return;
+            }
+          }
+
+          this.selected = { r: pos.r, c: pos.c };
+          this.audio.playSquish();
+        };
+
+        const handleMove = (clientX, clientY) => {
+          if (!this.dragInfo || this.state !== 'IDLE') return;
+          const rect = this.canvas.getBoundingClientRect();
+          const dx = (clientX - rect.left) - this.dragInfo.x;
+          const dy = (clientY - rect.top) - this.dragInfo.y;
+          const threshold = this.cellSize * 0.26;
+
+          if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+            let tr = this.dragInfo.r;
+            let tc = this.dragInfo.c;
+            if (Math.abs(dx) > Math.abs(dy)) {
+              tc += dx > 0 ? 1 : -1;
+            } else {
+              tr += dy > 0 ? 1 : -1;
+            }
+
+            const sr = this.dragInfo.r;
+            const sc = this.dragInfo.c;
+            this.dragInfo = null;
+            this.selected = null;
+
+            if (tr >= 0 && tr < this.ROWS && tc >= 0 && tc < this.COLS) {
+              this.attemptSwap(sr, sc, tr, tc);
+            }
+          }
+        };
+
+        const handleUp = () => {
+          this.dragInfo = null;
+        };
+
+        this.canvas.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          handleDown(e.clientX, e.clientY);
+        });
+        window.addEventListener('mousemove', (e) => {
+          if (this.dragInfo) handleMove(e.clientX, e.clientY);
+        });
+        window.addEventListener('mouseup', handleUp);
+
+        this.canvas.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          if (e.touches.length > 0) handleDown(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+          e.preventDefault();
+          if (e.touches.length > 0) handleMove(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          handleUp();
+        }, { passive: false });
+      }
+
+      // ぷにぷに弾性バネ（ぽよんモーション）を付与
+      triggerSquish(cell, amount = 0.24) {
+        if (!cell) return;
+        cell.squishVel = amount;
+      }
+
+      makePiece(r, c, type, opts = {}) {
+        const px = c * this.cellSize + this.cellSize / 2;
+        const py = r * this.cellSize + this.cellSize / 2;
+        return {
+          type,
+          helper: opts.helper || null, // null | 'row' | 'col' | 'bomb' | 'rainbow'
+          jelly: Boolean(opts.jelly),  // お邪魔1：ネオンゼリー殻
+          sleepy: Boolean(opts.sleepy), // お邪魔2：おやすみピース
+          x: opts.startX !== undefined ? opts.startX : px,
+          y: opts.startY !== undefined ? opts.startY : py,
+          targetX: px,
+          targetY: py,
+          scale: opts.scale !== undefined ? opts.scale : 1,
+          alpha: 1,
+          squish: 0,
+          squishVel: opts.squishVel || 0
+        };
+      }
+
+      createInitialBoard() {
+        do {
+          this.grid = [];
+          for (let r = 0; r < this.ROWS; r++) {
+            const row = [];
+            for (let c = 0; c < this.COLS; c++) {
+              let type;
+              do {
+                type = Math.floor(Math.random() * this.NUM_ANIMALS);
+              } while (
+                (c >= 2 && row[c - 1].type === type && row[c - 2].type === type) ||
+                (r >= 2 && this.grid[r - 1][c].type === type && this.grid[r - 2][c].type === type)
+              );
+              row.push(this.makePiece(r, c, type));
+            }
+            this.grid.push(row);
+          }
+        } while (!this.findAnyValidMove());
+      }
+
+      startNewGame() {
+        this.audio.init();
+        this.audio.startBgm();
+
+        this.startOverlay.classList.add('hidden');
+        this.resultOverlay.classList.add('hidden');
+
+        this.score = 0;
+        this.combo = 0;
+        this.maxCombo = 0;
+        this.energy = this.maxEnergy;
+        this.feverCharge = 0;
+        this.isFever = false;
+        this.feverTimer = 0;
+        this.nextObstacleScore = 1600;
+
+        this.sparkles = [];
+        this.floatTexts = [];
+        this.beams = [];
+        this.selected = null;
+        this.dragInfo = null;
+        this.boardFrame.classList.remove('fever-glow');
+
+        this.resize();
+        this.createInitialBoard();
+
+        // 登場時に全アニマルが「ぽよん！」と弾む
+        for (let r = 0; r < this.ROWS; r++) {
+          for (let c = 0; c < this.COLS; c++) {
+            this.grid[r][c].scale = 0.2;
+            this.triggerSquish(this.grid[r][c], 0.22);
+          }
+        }
+
+        this.updateHUD();
+        this.state = 'IDLE';
+      }
+
+      // 2ピース入れ替え試行
+      async attemptSwap(r1, c1, r2, c2) {
+        const p1 = this.grid[r1][c1];
+        const p2 = this.grid[r2][c2];
+        if (!p1 || !p2) return;
+
+        // おやすみピースは動かせない
+        if (p1.sleepy || p2.sleepy) {
+          this.audio.playSleepy();
+          const sleeper = p1.sleepy ? p1 : p2;
+          this.triggerSquish(sleeper, 0.16);
+          this.floatTexts.push({
+            text: 'Zzz... 💤',
+            x: sleeper.x,
+            y: sleeper.y - 16,
+            color: '#d4b8ff',
+            scale: 0.95,
+            life: 0.9
+          });
+          return;
+        }
+
+        this.state = 'BUSY';
+        this.swapGridCells(r1, c1, r2, c2);
+        this.triggerSquish(p1, 0.2);
+        this.triggerSquish(p2, 0.2);
+        await this.sleep(170);
+
+        // レインボーハートをスライドした場合の特別発動！
+        if (p1.helper === 'rainbow' || p2.helper === 'rainbow') {
+          this.combo = 0;
+          const rainbowPos = p1.helper === 'rainbow' ? { r: r2, c: c2 } : { r: r1, c: c1 };
+          const targetCell = p1.helper === 'rainbow' ? p2 : p1;
+          await this.triggerRainbowHeart(rainbowPos.r, rainbowPos.c, targetCell.type);
+          return;
+        }
+
+        const matches = this.scanMatches();
+        if (matches.length === 0) {
+          // 揃わなかった場合はぽよんと戻る
+          this.audio.playBounceBack();
+          this.swapGridCells(r1, c1, r2, c2);
+          this.triggerSquish(p1, 0.18);
+          this.triggerSquish(p2, 0.18);
+          await this.sleep(170);
+          this.state = 'IDLE';
+          return;
+        }
+
+        this.combo = 0;
+        this.lastSwappedCells = [{ r: r1, c: c1 }, { r: r2, c: c2 }];
+        await this.processMatchChain(matches);
+      }
+
+      swapGridCells(r1, c1, r2, c2) {
+        const tmp = this.grid[r1][c1];
+        this.grid[r1][c1] = this.grid[r2][c2];
+        this.grid[r2][c2] = tmp;
+        this.updateCellTarget(r1, c1);
+        this.updateCellTarget(r2, c2);
+      }
+
+      updateCellTarget(r, c) {
+        const cell = this.grid[r][c];
+        if (!cell) return;
+        cell.targetX = c * this.cellSize + this.cellSize / 2;
+        cell.targetY = r * this.cellSize + this.cellSize / 2;
+      }
+
+      // レインボーハート発動（同色アニマルを盤面から全消去！）
+      async triggerRainbowHeart(rRainbow, cRainbow, targetType) {
+        this.combo++;
+        if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+
+        const rainbowCell = this.grid[rRainbow][cRainbow];
+        const originX = rainbowCell.x;
+        const originY = rainbowCell.y;
+
+        this.audio.playHelperBurst('rainbow');
+        this.shake(7, 0.3);
+
+        const toClear = new Set([`${rRainbow},${cRainbow}`]);
+        for (let r = 0; r < this.ROWS; r++) {
+          for (let c = 0; c < this.COLS; c++) {
+            const cell = this.grid[r][c];
+            if (cell && cell.type === targetType) {
+              toClear.add(`${r},${c}`);
+              // レインボー光線エフェクト
+              this.beams.push({
+                kind: 'ray',
+                x1: originX,
+                y1: originY,
+                x2: cell.x,
+                y2: cell.y,
+                color: ANIMALS[targetType].main,
+                life: 1.0
+              });
+            }
+          }
+        }
+
+        await this.clearCellsAndCascade(toClear, [], true);
+      }
+
+      // 盤面全体の3つ以上マッチグループ検出
+      scanMatches() {
+        const hGroups = [];
+        const vGroups = [];
+
+        // 横方向
+        for (let r = 0; r < this.ROWS; r++) {
+          let c = 0;
+          while (c < this.COLS) {
+            const cell = this.grid[r][c];
+            if (!cell || cell.helper === 'rainbow') { c++; continue; }
+            let end = c + 1;
+            while (
+              end < this.COLS &&
+              this.grid[r][end] &&
+              this.grid[r][end].helper !== 'rainbow' &&
+              this.grid[r][end].type === cell.type
+            ) {
+              end++;
+            }
+            if (end - c >= 3) {
+              const cells = [];
+              for (let k = c; k < end; k++) cells.push({ r, c: k });
+              hGroups.push({ cells, dir: 'H', type: cell.type });
+            }
+            c = end;
+          }
+        }
+
+        // 縦方向
+        for (let c = 0; c < this.COLS; c++) {
+          let r = 0;
+          while (r < this.ROWS) {
+            const cell = this.grid[r][c];
+            if (!cell || cell.helper === 'rainbow') { r++; continue; }
+            let end = r + 1;
+            while (
+              end < this.ROWS &&
+              this.grid[end][c] &&
+              this.grid[end][c].helper !== 'rainbow' &&
+              this.grid[end][c].type === cell.type
+            ) {
+              end++;
+            }
+            if (end - r >= 3) {
+              const cells = [];
+              for (let k = r; k < end; k++) cells.push({ r: k, c });
+              vGroups.push({ cells, dir: 'V', type: cell.type });
+            }
+            r = end;
+          }
+        }
+
+        // L字・T字交差を統合
+        const raw = [...hGroups, ...vGroups];
+        const merged = [];
+        const used = new Array(raw.length).fill(false);
+
+        for (let i = 0; i < raw.length; i++) {
+          if (used[i]) continue;
+          used[i] = true;
+          const group = {
+            cells: [...raw[i].cells],
+            hasH: raw[i].dir === 'H',
+            hasV: raw[i].dir === 'V',
+            type: raw[i].type
+          };
+
+          let expanded = true;
+          while (expanded) {
+            expanded = false;
+            for (let j = 0; j < raw.length; j++) {
+              if (used[j] || raw[j].type !== group.type) continue;
+              const overlap = raw[j].cells.some(a =>
+                group.cells.some(b => a.r === b.r && a.c === b.c)
+              );
+              if (overlap) {
+                used[j] = true;
+                expanded = true;
+                if (raw[j].dir === 'H') group.hasH = true;
+                if (raw[j].dir === 'V') group.hasV = true;
+                for (const p of raw[j].cells) {
+                  if (!group.cells.some(e => e.r === p.r && e.c === p.c)) {
+                    group.cells.push(p);
+                  }
+                }
+              }
+            }
+          }
+          merged.push(group);
+        }
+
+        return merged;
+      }
+
+      // マッチ連鎖ループ処理
+      async processMatchChain(initialMatches) {
+        let matches = initialMatches;
+
+        while (matches.length > 0) {
+          this.combo++;
+          if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+
+          const matchedSet = new Set();
+          const helpersToSpawn = []; // { r, c, type, helper }
+
+          for (const g of matches) {
+            let helperKind = null;
+            // 5つ以上直線 -> レインボーハート
+            if (g.cells.length >= 5 && !(g.hasH && g.hasV)) {
+              helperKind = 'rainbow';
+            } else if (g.hasH && g.hasV) {
+              // L字・T字交差 -> ネオンボム
+              helperKind = 'bomb';
+            } else if (g.cells.length === 4) {
+              // 4つ直線 -> スターライン
+              helperKind = g.hasH ? 'row' : 'col';
+            }
+
+            if (helperKind) {
+              let pos = null;
+              if (this.lastSwappedCells) {
+                pos = g.cells.find(p =>
+                  (p.r === this.lastSwappedCells[0].r && p.c === this.lastSwappedCells[0].c) ||
+                  (p.r === this.lastSwappedCells[1].r && p.c === this.lastSwappedCells[1].c)
+                );
+              }
+              if (!pos) pos = g.cells[Math.floor(g.cells.length / 2)];
+              helpersToSpawn.push({
+                r: pos.r,
+                c: pos.c,
+                type: g.type,
+                helper: helperKind
+              });
+            }
+
+            for (const cell of g.cells) {
+              matchedSet.add(`${cell.r},${cell.c}`);
+            }
+          }
+
+          this.lastSwappedCells = null;
+          await this.clearCellsAndCascade(matchedSet, helpersToSpawn, false);
+          matches = this.scanMatches();
+        }
+
+        // スコアに応じてお邪魔ピースを少しずつ追加（盤面に変化をつける）
+        this.maybeSpawnObstacles();
+
+        // 手詰まり防止チェック
+        if (!this.findAnyValidMove() && this.state !== 'GAMEOVER') {
+          await this.performAutoShuffle();
+        }
+
+        if (this.state !== 'GAMEOVER') {
+          this.state = 'IDLE';
+        }
+      }
+
+      // 消去・ゼリー殻破壊・お助け誘爆・落下補充を一括実行
+      async clearCellsAndCascade(initialSet, helpersToSpawn, forceInstantBreak) {
+        const toDestroy = new Set(initialSet);
+        const jellyToCrack = new Set();
+
+        // 1) 直接マッチしたピースに隣接する「ネオンゼリー殻」もダメージ対象にする
+        const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        for (const key of initialSet) {
+          const [r, c] = key.split(',').map(Number);
+          for (const [dr, dc] of dirs) {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < this.ROWS && nc >= 0 && nc < this.COLS) {
+              const adj = this.grid[nr][nc];
+              if (adj && adj.jelly) {
+                jellyToCrack.add(`${nr},${nc}`);
+              }
+            }
+          }
+        }
+
+        // 2) お助けピースの連鎖誘爆展開
+        let hasExplosion = false;
+        const queue = Array.from(toDestroy);
+        const triggered = new Set();
+
+        while (queue.length > 0) {
+          const key = queue.shift();
+          const [r, c] = key.split(',').map(Number);
+          const cell = this.grid[r][c];
+          if (!cell || !cell.helper || triggered.has(key)) continue;
+
+          triggered.add(key);
+          hasExplosion = true;
+          const color = ANIMALS[cell.type].main;
+
+          if (cell.helper === 'row') {
+            this.beams.push({ kind: 'row', x: cell.x, y: cell.y, color, life: 1.0 });
+            for (let cc = 0; cc < this.COLS; cc++) {
+              const k = `${r},${cc}`;
+              if (!toDestroy.has(k)) {
+                toDestroy.add(k);
+                queue.push(k);
+              }
+            }
+          } else if (cell.helper === 'col') {
+            this.beams.push({ kind: 'col', x: cell.x, y: cell.y, color, life: 1.0 });
+            for (let rr = 0; rr < this.ROWS; rr++) {
+              const k = `${rr},${c}`;
+              if (!toDestroy.has(k)) {
+                toDestroy.add(k);
+                queue.push(k);
+              }
+            }
+          } else if (cell.helper === 'bomb') {
+            this.beams.push({ kind: 'bomb', x: cell.x, y: cell.y, color, life: 1.0 });
+            for (let rr = r - 1; rr <= r + 1; rr++) {
+              for (let cc = c - 1; cc <= c + 1; cc++) {
+                if (rr >= 0 && rr < this.ROWS && cc >= 0 && cc < this.COLS) {
+                  const k = `${rr},${cc}`;
+                  if (!toDestroy.has(k)) {
+                    toDestroy.add(k);
+                    queue.push(k);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // サウンド＆シェイク
+        this.audio.playComboMatch(this.combo, helpersToSpawn.length > 0);
+        if (hasExplosion) {
+          this.audio.playHelperBurst('bomb');
+          this.shake(6.5, 0.24);
+        } else if (this.combo >= 2) {
+          this.shake(3.2, 0.14);
+        }
+
+        // 3) ゼリー殻付きピースは、爆風(hasExplosion/forceInstantBreak)なら一発破壊、通常マッチなら殻だけ割って中身を残す
+        const actualDestroyed = new Set();
+        let brokeAnyJelly = false;
+
+        for (const key of toDestroy) {
+          const [r, c] = key.split(',').map(Number);
+          const cell = this.grid[r][c];
+          if (!cell) continue;
+
+          if (cell.jelly && !hasExplosion && !forceInstantBreak) {
+            jellyToCrack.add(key);
+          } else {
+            if (cell.jelly) brokeAnyJelly = true;
+            actualDestroyed.add(key);
+          }
+        }
+
+        // 隣接＆マッチで割れるゼリー殻の処理
+        for (const key of jellyToCrack) {
+          if (actualDestroyed.has(key)) continue;
+          const [r, c] = key.split(',').map(Number);
+          const cell = this.grid[r][c];
+          if (cell && cell.jelly) {
+            cell.jelly = false;
+            brokeAnyJelly = true;
+            this.triggerSquish(cell, 0.26);
+            this.spawnSparkleBurst(cell.x, cell.y, '#2cf6ff', 10, true);
+            this.floatTexts.push({
+              text: 'パリン！✨',
+              x: cell.x,
+              y: cell.y - 12,
+              color: '#9efcff',
+              scale: 0.9,
+              life: 0.85
+            });
+          }
+        }
+
+        if (brokeAnyJelly) {
+          this.audio.playJellyBreak();
+        }
+
+        // 4) スコア＆ゲージ計算
+        const count = Math.max(1, actualDestroyed.size + jellyToCrack.size);
+        const feverMult = this.isFever ? 2.0 : 1.0;
+        const comboMult = 1 + (this.combo - 1) * 0.5;
+        const pts = Math.round(count * 60 * comboMult * feverMult);
+        this.score += pts;
+
+        if (this.score > this.bestScore) {
+          this.bestScore = this.score;
+          localStorage.setItem('neonAnimalPartyBest', String(this.bestScore));
+        }
+
+        // エネルギー回復＆フィーバーチャージ
+        const recover = Math.min(25, count * 1.45 + (this.combo - 1) * 2.6);
+        this.energy = Math.min(this.maxEnergy, this.energy + recover);
+
+        if (!this.isFever) {
+          this.feverCharge += count * 3.8 + (this.combo - 1) * 8.5;
+          if (this.feverCharge >= 100) {
+            this.startFeverMode();
+          }
+        }
+
+        this.updateHUD();
+
+        // 5) キラキラコンボ演出パーティクル＆テキスト生成
+        let sumX = 0, sumY = 0, n = 0;
+        const sparkleDensity = Math.min(18, 7 + this.combo * 2);
+
+        for (const key of actualDestroyed) {
+          const [r, c] = key.split(',').map(Number);
+          const cell = this.grid[r][c];
+          if (!cell) continue;
+          sumX += cell.x;
+          sumY += cell.y;
+          n++;
+
+          const col = ANIMALS[cell.type].main;
+          this.spawnSparkleBurst(cell.x, cell.y, col, sparkleDensity, this.combo >= 2);
+          cell.scale = 0.01;
+          cell.alpha = 0;
+        }
+
+        if (n > 0) {
+          const cx = sumX / n;
+          const cy = sumY / n;
+
+          this.floatTexts.push({
+            text: `+${pts}`,
+            x: cx,
+            y: cy,
+            color: '#ffffff',
+            scale: 1.0,
+            life: 1.0
+          });
+
+          if (this.combo >= 2) {
+            const label = this.combo >= 5 ? `${this.combo} COMBO!! 🌟` : `${this.combo} COMBO! ✨`;
+            this.floatTexts.push({
+              text: label,
+              x: cx,
+              y: cy - 26,
+              color: this.combo >= 4 ? '#ff52d9' : '#ffe64d',
+              scale: Math.min(1.5, 1.15 + this.combo * 0.06),
+              life: 1.2
+            });
+          }
+        }
+
+        await this.sleep(175);
+
+        // 6) 消去完了＆お助けピース配置
+        for (const key of actualDestroyed) {
+          const [r, c] = key.split(',').map(Number);
+          this.grid[r][c] = null;
+        }
+
+        for (const h of helpersToSpawn) {
+          this.grid[h.r][h.c] = this.makePiece(h.r, h.c, h.type, {
+            helper: h.helper,
+            scale: 0.25,
+            squishVel: 0.3
+          });
+        }
+
+        // 7) 重力落下＆補充（着地時にぽよんと弾む）
+        this.dropAndFill();
+        await this.sleep(215);
+      }
+
+      dropAndFill() {
+        for (let c = 0; c < this.COLS; c++) {
+          let writeRow = this.ROWS - 1;
+          for (let r = this.ROWS - 1; r >= 0; r--) {
+            const cell = this.grid[r][c];
+            if (cell !== null) {
+              if (r !== writeRow) {
+                this.grid[writeRow][c] = cell;
+                this.grid[r][c] = null;
+                this.updateCellTarget(writeRow, c);
+                this.triggerSquish(cell, 0.16);
+              }
+              writeRow--;
+            }
+          }
+
+          let spawnIdx = 1;
+          for (let r = writeRow; r >= 0; r--) {
+            const type = Math.floor(Math.random() * this.NUM_ANIMALS);
+            const tx = c * this.cellSize + this.cellSize / 2;
+            const ty = r * this.cellSize + this.cellSize / 2;
+            const sy = -spawnIdx * this.cellSize + this.cellSize / 2;
+            spawnIdx++;
+
+            this.grid[r][c] = this.makePiece(r, c, type, {
+              startX: tx,
+              startY: sy,
+              squishVel: 0.2
+            });
+          }
+        }
+      }
+
+      // スコア進行に応じてお邪魔ピース（ゼリー殻／おやすみ）を1〜2個配置
+      maybeSpawnObstacles() {
+        if (this.score < this.nextObstacleScore) return;
+        this.nextObstacleScore += 2200;
+
+        // 現在の盤面のお邪魔数をカウント（増えすぎ防止で最大6個まで）
+        let currentObstacles = 0;
+        const candidates = [];
+        for (let r = 0; r < this.ROWS; r++) {
+          for (let c = 0; c < this.COLS; c++) {
+            const cell = this.grid[r][c];
+            if (!cell) continue;
+            if (cell.jelly || cell.sleepy) {
+              currentObstacles++;
+            } else if (!cell.helper) {
+              candidates.push(cell);
+            }
+          }
+        }
+
+        if (currentObstacles >= 6 || candidates.length === 0) return;
+
+        const target = candidates[Math.floor(Math.random() * candidates.length)];
+        if (Math.random() < 0.55) {
+          target.jelly = true;
+          this.spawnSparkleBurst(target.x, target.y, '#2cf6ff', 8, false);
+        } else {
+          target.sleepy = true;
+          this.spawnSparkleBurst(target.x, target.y, '#be75ff', 8, false);
+        }
+        this.triggerSquish(target, 0.22);
+      }
+
+      findAnyValidMove() {
+        const testSwap = (r1, c1, r2, c2) => {
+          const p1 = this.grid[r1][c1];
+          const p2 = this.grid[r2][c2];
+          if (!p1 || !p2 || p1.sleepy || p2.sleepy) return false;
+          if (p1.helper === 'rainbow' || p2.helper === 'rainbow') return true;
+
+          this.grid[r1][c1] = p2;
+          this.grid[r2][c2] = p1;
+          const ok = this.scanMatches().length > 0;
+          this.grid[r1][c1] = p1;
+          this.grid[r2][c2] = p2;
+          return ok;
+        };
+
+        for (let r = 0; r < this.ROWS; r++) {
+          for (let c = 0; c < this.COLS; c++) {
+            if (c + 1 < this.COLS && testSwap(r, c, r, c + 1)) return true;
+            if (r + 1 < this.ROWS && testSwap(r, c, r + 1, c)) return true;
+          }
+        }
+        return false;
+      }
+
+      async performAutoShuffle() {
+        this.floatTexts.push({
+          text: 'シャッフル！ 🔄✨',
+          x: this.boardPx / 2,
+          y: this.boardPx / 2,
+          color: '#2cf6ff',
+          scale: 1.35,
+          life: 1.3
+        });
+
+        await this.sleep(320);
+        this.createInitialBoard();
+        for (let r = 0; r < this.ROWS; r++) {
+          for (let c = 0; c < this.COLS; c++) {
+            this.grid[r][c].scale = 0.2;
+            this.triggerSquish(this.grid[r][c], 0.25);
+          }
+        }
+        await this.sleep(240);
+      }
+
+      startFeverMode() {
+        this.isFever = true;
+        this.feverCharge = 100;
+        this.feverTimer = 8.5;
+        this.boardFrame.classList.add('fever-glow');
+        this.audio.playFever();
+        this.shake(6, 0.28);
+
+        // 盤面全体にキラキラ花火を散らす
+        for (let i = 0; i < 6; i++) {
+          const rx = (0.15 + Math.random() * 0.7) * this.boardPx;
+          const ry = (0.15 + Math.random() * 0.7) * this.boardPx;
+          this.spawnSparkleBurst(rx, ry, ANIMALS[i].main, 12, true);
+        }
+
+        this.floatTexts.push({
+          text: '🎉 FEVER TIME! x2 🎉',
+          x: this.boardPx / 2,
+          y: this.boardPx / 2,
+          color: '#ff52d9',
+          scale: 1.4,
+          life: 1.4
+        });
+      }
+
+      shake(amp, dur) {
+        this.shakeAmp = amp;
+        this.shakeTime = dur;
+      }
+
+      // キラキラ星＆ダイヤパーティクル発生
+      spawnSparkleBurst(x, y, color, count = 10, starShape = false) {
+        for (let i = 0; i < count; i++) {
+          const ang = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
+          const spd = 55 + Math.random() * 145;
+          this.sparkles.push({
+            x,
+            y,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd - 20,
+            size: 3.2 + Math.random() * 4.5,
+            rot: Math.random() * Math.PI * 2,
+            vrot: (Math.random() - 0.5) * 10,
+            color: i % 3 === 0 ? '#ffffff' : color,
+            star: starShape && i % 2 === 0,
+            life: 1.0
+          });
+        }
+      }
+
+      updateHUD() {
+        this.scoreVal.textContent = this.score.toLocaleString();
+        this.bestVal.textContent = this.bestScore.toLocaleString();
+
+        const mult = (1 + Math.max(0, this.combo - 1) * 0.5) * (this.isFever ? 2 : 1);
+        this.multVal.textContent = `x${mult.toFixed(1)}`;
+
+        if (this.isFever) {
+          this.feverPill.textContent = '🔥 FEVER x2.0!';
+          this.feverPill.classList.add('active');
+          this.energyFill.classList.add('fever');
+          this.energyFill.classList.remove('danger');
+        } else {
+          this.feverPill.textContent = `✨ FEVER ${Math.min(100, Math.floor(this.feverCharge))}%`;
+          this.feverPill.classList.remove('active');
+          this.energyFill.classList.remove('fever');
+          if (this.energy <= 25) {
+            this.energyFill.classList.add('danger');
+          } else {
+            this.energyFill.classList.remove('danger');
+          }
+        }
+
+        const pct = Math.max(0, Math.min(100, (this.energy / this.maxEnergy) * 100));
+        this.energyFill.style.width = `${pct}%`;
+      }
+
+      triggerGameOver() {
+        this.state = 'GAMEOVER';
+        this.audio.stopBgm();
+        this.audio.playGameOver();
+
+        const isRecord = this.score > 0 && this.score >= this.bestScore;
+        this.newRecordTag.classList.toggle('hidden', !isRecord);
+        this.resScore.textContent = this.score.toLocaleString();
+        this.resBest.textContent = this.bestScore.toLocaleString();
+        this.resCombo.textContent = `${this.maxCombo} COMBO`;
+        this.syncBestUI();
+
+        this.resultOverlay.classList.remove('hidden');
+      }
+
+      sleep(ms) {
+        return new Promise(res => setTimeout(res, ms));
+      }
+
+      // ==========================================================================
+      // 毎フレーム更新＆描画
+      // ==========================================================================
+      update(dt) {
+        this.time += dt;
+
+        if (this.state !== 'MENU' && this.state !== 'GAMEOVER') {
+          if (this.isFever) {
+            this.feverTimer -= dt;
+            if (this.feverTimer <= 0) {
+              this.isFever = false;
+              this.feverCharge = 0;
+              this.boardFrame.classList.remove('fever-glow');
+            }
+          }
+
+          // 操作待ち(IDLE)の間だけゲージ減少（アニメーション中は減らない）
+          if (this.state === 'IDLE') {
+            const speedUp = 1 + Math.min(1.05, this.score / 50000);
+            const drain = (this.isFever ? 3.0 : 5.2) * speedUp;
+            this.energy -= drain * dt;
+            if (this.energy <= 0) {
+              this.energy = 0;
+              this.updateHUD();
+              this.triggerGameOver();
+              return;
+            }
+          }
+          this.updateHUD();
+        }
+
+        if (this.shakeTime > 0) {
+          this.shakeTime = Math.max(0, this.shakeTime - dt);
+        }
+
+        // ピース座標＆「ぽよん」弾性バネ物理更新
+        const moveLerp = Math.min(1, dt * 19);
+        for (let r = 0; r < this.ROWS; r++) {
+          for (let c = 0; c < this.COLS; c++) {
+            const cell = this.grid[r][c];
+            if (!cell) continue;
+            cell.x += (cell.targetX - cell.x) * moveLerp;
+            cell.y += (cell.targetY - cell.y) * moveLerp;
+
+            if (cell.alpha > 0 && cell.scale < 1) {
+              cell.scale += (1 - cell.scale) * Math.min(1, dt * 15);
+            }
+
+            // バネ振動（squish）
+            const springForce = -180 * cell.squish;
+            cell.squishVel += springForce * dt;
+            cell.squishVel *= Math.pow(0.06, dt);
+            cell.squish += cell.squishVel * dt;
+          }
+        }
+
+        // キラキラパーティクル更新
+        for (let i = this.sparkles.length - 1; i >= 0; i--) {
+          const p = this.sparkles[i];
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vy += 150 * dt;
+          p.rot += p.vrot * dt;
+          p.life -= dt * 1.75;
+          if (p.life <= 0) this.sparkles.splice(i, 1);
+        }
+
+        // ビーム・光線更新
+        for (let i = this.beams.length - 1; i >= 0; i--) {
+          this.beams[i].life -= dt * 3.1;
+          if (this.beams[i].life <= 0) this.beams.splice(i, 1);
+        }
+
+        // フロートテキスト更新
+        for (let i = this.floatTexts.length - 1; i >= 0; i--) {
+          const ft = this.floatTexts[i];
+          ft.y -= 32 * dt;
+          ft.life -= dt * 1.1;
+          if (ft.life <= 0) this.floatTexts.splice(i, 1);
+        }
+      }
+
+      draw() {
+        const ctx = this.ctx;
+        const size = this.boardPx;
+        const cs = this.cellSize;
+
+        ctx.clearRect(0, 0, size, size);
+
+        ctx.save();
+        if (this.shakeTime > 0) {
+          ctx.translate(
+            (Math.random() - 0.5) * 2 * this.shakeAmp,
+            (Math.random() - 0.5) * 2 * this.shakeAmp
+          );
+        }
+
+        // 1. 盤面タイル背景
+        for (let r = 0; r < this.ROWS; r++) {
+          for (let c = 0; c < this.COLS; c++) {
+            const even = (r + c) % 2 === 0;
+            ctx.fillStyle = even ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)';
+            ctx.beginPath();
+            ctx.roundRect(c * cs + 2, r * cs + 2, cs - 4, cs - 4, 12);
+            ctx.fill();
+          }
+        }
+
+        // 2. 選択枠ハイライト
+        if (this.selected && this.state === 'IDLE') {
+          const { r, c } = this.selected;
+          const glow = 0.65 + 0.35 * Math.sin(this.time * 9);
+          ctx.save();
+          ctx.strokeStyle = `rgba(44, 246, 255, ${glow})`;
+          ctx.lineWidth = 3;
+          ctx.shadowColor = '#2cf6ff';
+          ctx.shadowBlur = 14;
+          ctx.beginPath();
+          ctx.roundRect(c * cs + 3, r * cs + 3, cs - 6, cs - 6, 14);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // 3. ぷにぷにネオンアニマル描画
+        const radius = cs * 0.43;
+        for (let r = 0; r < this.ROWS; r++) {
+          for (let c = 0; c < this.COLS; c++) {
+            const cell = this.grid[r][c];
+            if (!cell || cell.alpha <= 0) continue;
+
+            const isSel = this.selected && this.selected.r === r && this.selected.c === c;
+            const selPulse = isSel ? Math.sin(this.time * 11) * 0.06 : 0;
+            const sx = cell.scale * (1 + cell.squish + selPulse);
+            const sy = cell.scale * (1 - cell.squish + selPulse);
+
+            ctx.save();
+            ctx.globalAlpha = cell.alpha;
+            ctx.translate(cell.x, cell.y);
+            ctx.scale(sx, sy);
+            drawPuniAnimal(ctx, cell.type, 0, 0, radius, {
+              helper: cell.helper,
+              jelly: cell.jelly,
+              sleepy: cell.sleepy,
+              time: this.time
+            });
+            ctx.restore();
+          }
+        }
+
+        // 4. ビーム＆レインボー光線演出
+        for (const b of this.beams) {
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, b.life);
+          ctx.shadowColor = b.color;
+          ctx.shadowBlur = 20;
+
+          if (b.kind === 'row') {
+            const h = cs * 0.78 * b.life;
+            const g = ctx.createLinearGradient(0, b.y - h / 2, 0, b.y + h / 2);
+            g.addColorStop(0, 'transparent');
+            g.addColorStop(0.5, '#ffffff');
+            g.addColorStop(1, 'transparent');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, b.y - h / 2, size, h);
+          } else if (b.kind === 'col') {
+            const w = cs * 0.78 * b.life;
+            const g = ctx.createLinearGradient(b.x - w / 2, 0, b.x + w / 2, 0);
+            g.addColorStop(0, 'transparent');
+            g.addColorStop(0.5, '#ffffff');
+            g.addColorStop(1, 'transparent');
+            ctx.fillStyle = g;
+            ctx.fillRect(b.x - w / 2, 0, w, size);
+          } else if (b.kind === 'bomb') {
+            const rad = cs * 1.85 * (1.25 - b.life * 0.5);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 6 * b.life;
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, rad, 0, Math.PI * 2);
+            ctx.stroke();
+          } else if (b.kind === 'ray') {
+            ctx.strokeStyle = b.color;
+            ctx.lineWidth = 5 * b.life;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(b.x1, b.y1);
+            ctx.lineTo(b.x2, b.y2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        // 5. コンボ・キラキラパーティクル描画
+        for (const p of this.sparkles) {
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, p.life);
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 10;
+
+          const s = p.size * p.life;
+          if (p.star) {
+            // 4芒キラキラ星
+            ctx.beginPath();
+            ctx.moveTo(0, -s * 1.6);
+            ctx.lineTo(s * 0.45, -s * 0.45);
+            ctx.lineTo(s * 1.6, 0);
+            ctx.lineTo(s * 0.45, s * 0.45);
+            ctx.lineTo(0, s * 1.6);
+            ctx.lineTo(-s * 0.45, s * 0.45);
+            ctx.lineTo(-s * 1.6, 0);
+            ctx.lineTo(-s * 0.45, -s * 0.45);
+            ctx.closePath();
+            ctx.fill();
+          } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, s, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        // 6. ポップなコンボ＆スコア文字
+        for (const ft of this.floatTexts) {
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, ft.life * 1.4);
+          ctx.font = `800 ${Math.round(15 * ft.scale)}px 'Fredoka', 'M PLUS Rounded 1c', sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = 'rgba(15, 7, 38, 0.92)';
+          ctx.strokeText(ft.text, ft.x, ft.y);
+
+          ctx.fillStyle = ft.color;
+          ctx.shadowColor = ft.color;
+          ctx.shadowBlur = 12;
+          ctx.fillText(ft.text, ft.x, ft.y);
+          ctx.restore();
+        }
+
+        ctx.restore();
+      }
+    }
+
+    // ============================================================================
+    // 5. 起動ループ
+    // ============================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      const bg = new NightPartyBackground(document.getElementById('bgCanvas'));
+      const game = new AnimalPartyMatch3();
+
+      let prev = performance.now();
+      function loop(now) {
+        const dt = Math.min(0.05, (now - prev) / 1000);
+        prev = now;
+
+        bg.render();
+        game.update(dt);
+        game.draw();
+
+        requestAnimationFrame(loop);
+      }
+
+      requestAnimationFrame(loop);
+    });
+  </script>
+</body>
+</html>
