@@ -389,10 +389,10 @@
               <span class="text-2xl" aria-hidden="true">✨</span>
             </div>
             <h2 class="text-lg sm:text-xl font-black text-white leading-snug">
-              ネオンナイト＊アニマルパーティー🐻‍❄️
+              ネオンナイト＊アニマルパーティー
             </h2>
             <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              ネオン調アニマルの3マッチゲームです🐻‍❄️✨
+              ネオン調の可愛いアニマルの3マッチパズル
             </p>
           </div>
           <a href="./game5/" class="play-btn new5-btn w-full py-3 px-4 rounded-2xl text-center text-sm font-black text-white tracking-wide block">
@@ -538,8 +538,7 @@
           const horizontal = Math.random() < 0.55;
           const color = pal.streaks[Math.floor(Math.random() * pal.streaks.length)];
           if (horizontal) {
-            const row = Math.floor(Math.random() * Math.m
-ax(1, height / GRID_SIZE)) * GRID_SIZE;
+            const row = Math.floor(Math.random() * Math.max(1, height / GRID_SIZE)) * GRID_SIZE;
             const dir = Math.random() < 0.5 ? 1 : -1;
             lightStreaks.push({
               horizontal: true,
@@ -638,6 +637,7 @@ ax(1, height / GRID_SIZE)) * GRID_SIZE;
         }
       }
 
+      // click と touchstart の両方で確実に反応させる
       animalBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
         reactAnimal(true);
