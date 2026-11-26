@@ -176,57 +176,68 @@
       animation: pulseBeacon 1.8s ease-in-out infinite;
     }
 
-    /* ぴょこぴょこマスコットアニメーション */
-    @keyframes pyokoBounce {
+    /* ぴょこぴょこアニマル常時バウンド（位置移動はJSで制御） */
+    @keyframes animalIdlePyoko {
       0%, 100% {
-        transform: translateY(0px) scaleX(1.06) scaleY(0.92);
+        transform: translateY(0px) scale(1.05, 0.94);
       }
-      22% {
-        transform: translateY(-18px) scaleX(0.94) scaleY(1.08) rotate(-4deg);
+      25% {
+        transform: translateY(-14px) scale(0.95, 1.07) rotate(-4deg);
       }
-      45% {
-        transform: translateY(0px) scaleX(1.08) scaleY(0.90);
+      50% {
+        transform: translateY(0px) scale(1.06, 0.92);
       }
-      65% {
-        transform: translateY(-10px) scaleX(0.97) scaleY(1.04) rotate(4deg);
-      }
-      82% {
-        transform: translateY(0px) scaleX(1.04) scaleY(0.95);
+      75% {
+        transform: translateY(-8px) scale(0.98, 1.04) rotate(4deg);
       }
     }
 
-    @keyframes pyokoExcited {
-      0% { transform: translateY(0) scale(1); }
-      25% { transform: translateY(-28px) scale(1.12, 0.88) rotate(-10deg); }
-      50% { transform: translateY(-8px) scale(0.92, 1.12) rotate(10deg); }
-      75% { transform: translateY(-22px) scale(1.08, 0.92) rotate(-6deg); }
-      100% { transform: translateY(0) scale(1) rotate(0deg); }
+    @keyframes animalTapJump {
+      0% {
+        transform: translateY(0) scale(1, 1) rotate(0deg);
+      }
+      25% {
+        transform: translateY(-26px) scale(0.9, 1.14) rotate(-12deg);
+      }
+      50% {
+        transform: translateY(-4px) scale(1.12, 0.88) rotate(12deg);
+      }
+      75% {
+        transform: translateY(-18px) scale(0.95, 1.08) rotate(-6deg);
+      }
+      100% {
+        transform: translateY(0) scale(1, 1) rotate(0deg);
+      }
     }
 
-    .pyoko-mascot {
+    .animal-mover {
       position: fixed;
-      bottom: 18px;
+      bottom: 16px;
       left: 20px;
-      z-index: 40;
+      z-index: 45;
       cursor: pointer;
       user-select: none;
+      -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      animation: pyokoBounce 1.7s ease-in-out infinite;
-      transition: left 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), bottom 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-      filter: drop-shadow(0 8px 16px rgba(34, 211, 238, 0.35));
+      transition: left 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+      filter: drop-shadow(0 8px 16px rgba(232, 121, 249, 0.42));
     }
 
-    .pyoko-mascot.is-excited {
-      animation: pyokoExcited 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+    .animal-body {
+      display: block;
+      animation: animalIdlePyoko 1.5s ease-in-out infinite;
     }
 
-    /* タップ時ポップエフェクト */
+    .animal-mover.is-jumping .animal-body {
+      animation: animalTapJump 0.62s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
     @keyframes tapPopBurst {
       0% {
         opacity: 1;
-        transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+        transform: translate(-50%, -50%) scale(0.45) rotate(0deg);
       }
-      70% {
+      75% {
         opacity: 1;
       }
       100% {
@@ -238,10 +249,10 @@
     .tap-pop-item {
       position: fixed;
       pointer-events: none;
-      z-index: 45;
+      z-index: 50;
       font-weight: 900;
       animation: tapPopBurst 0.68s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-      text-shadow: 0 0 10px rgba(255, 255, 255, 0.65);
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
     }
   </style>
 </head>
@@ -381,7 +392,7 @@
               ネオンナイト＊アニマルパーティー
             </h2>
             <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              ぷにぷにした可愛いネオン調アニマルの3マッチパズルゲーム<code class="text-cyan-300">./game5/</code> に設定済みです。
+              ネオン調の可愛いアニマル3マッチゲームです🐻‍❄️ <code class="text-cyan-300">
             </p>
           </div>
           <a href="./game5/" class="play-btn new5-btn w-full py-3 px-4 rounded-2xl text-center text-sm font-black text-white tracking-wide block">
@@ -399,35 +410,44 @@
     </footer>
   </div>
 
-  <!-- ぴょこぴょこ動くマスコットキャラ -->
-  <div id="pyokoMascot" class="pyoko-mascot" title="タップしてね！" aria-label="ぴょこぴょこマスコット">
-    <svg width="68" height="68" viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- お耳・ツノ風アクセント -->
-      <path d="M18 22L13 8L27 17" fill="#e879f9" stroke="#22d3ee" stroke-width="2.2" stroke-linejoin="round"/>
-      <path d="M50 22L55 8L41 17" fill="#22d3ee" stroke="#e879f9" stroke-width="2.2" stroke-linejoin="round"/>
-      <!-- ぷにぷにボディ -->
-      <path d="M12 46C12 27 21 18 34 18C47 18 56 27 56 46C56 54 47 58 34 58C21 58 12 54 12 46Z" fill="url(#mascotGrad)" stroke="#ffffff" stroke-opacity="0.7" stroke-width="2"/>
-      <!-- ツヤハイライト -->
-      <ellipse cx="24" cy="28" rx="6" ry="3.5" transform="rotate(-22 24 28)" fill="#ffffff" fill-opacity="0.65"/>
-      <!-- ほっぺ -->
-      <ellipse cx="21" cy="43" rx="4" ry="2.4" fill="#fb7185" fill-opacity="0.7"/>
-      <ellipse cx="47" cy="43" rx="4" ry="2.4" fill="#fb7185" fill-opacity="0.7"/>
-      <!-- おめめ -->
-      <circle cx="26" cy="38" r="3.4" fill="#060714"/>
-      <circle cx="25" cy="36.8" r="1.2" fill="#ffffff"/>
-      <circle cx="42" cy="38" r="3.4" fill="#060714"/>
-      <circle cx="41" cy="36.8" r="1.2" fill="#ffffff"/>
-      <!-- にっこりお口 -->
-      <path d="M30 43.5C31.5 46 36.5 46 38 43.5" stroke="#060714" stroke-width="2.3" stroke-linecap="round"/>
-      <defs>
-        <linearGradient id="mascotGrad" x1="14" y1="18" x2="54" y2="58" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stop-color="#22d3ee"/>
-          <stop offset="55%" stop-color="#a855f7"/>
-          <stop offset="100%" stop-color="#ec4899"/>
-        </linearGradient>
-      </defs>
-    </svg>
-  </div>
+  <!-- ぴょこぴょこ動くちびアニマル（うさ耳＆しっぽ付きネオンアニマル） -->
+  <button id="animalBtn" type="button" class="animal-mover" aria-label="ぴょこぴょこアニマルをなでる">
+    <span class="animal-body">
+      <svg width="74" height="74" viewBox="0 0 74 74" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- ふわふわしっぽ -->
+        <circle cx="58" cy="52" r="8" fill="#fbcfe8" stroke="#f472b6" stroke-width="2"/>
+        <!-- 長いうさ耳 -->
+        <ellipse cx="25" cy="18" rx="6.5" ry="15" transform="rotate(-10 25 18)" fill="#f8fafc" stroke="#22d3ee" stroke-width="2.2"/>
+        <ellipse cx="25.5" cy="19" rx="3.2" ry="10" transform="rotate(-10 25.5 19)" fill="#f472b6"/>
+        <ellipse cx="47" cy="18" rx="6.5" ry="15" transform="rotate(10 47 18)" fill="#f8fafc" stroke="#e879f9" stroke-width="2.2"/>
+        <ellipse cx="46.5" cy="19" rx="3.2" ry="10" transform="rotate(10 46.5 19)" fill="#f472b6"/>
+        <!-- ちびあんよ -->
+        <ellipse cx="27" cy="61" rx="7" ry="4.5" fill="#fbcfe8" stroke="#e879f9" stroke-width="1.8"/>
+        <ellipse cx="45" cy="61" rx="7" ry="4.5" fill="#fbcfe8" stroke="#22d3ee" stroke-width="1.8"/>
+        <!-- お顔＆ボディ -->
+        <ellipse cx="36" cy="43" rx="20" ry="17" fill="url(#bunnyGrad)" stroke="#ffffff" stroke-width="2"/>
+        <!-- ツヤ -->
+        <ellipse cx="25" cy="32" rx="5.5" ry="3" transform="rotate(-20 25 32)" fill="#ffffff" fill-opacity="0.7"/>
+        <!-- ほっぺ -->
+        <ellipse cx="22" cy="46" rx="4.2" ry="2.5" fill="#fb7185" fill-opacity="0.75"/>
+        <ellipse cx="50" cy="46" rx="4.2" ry="2.5" fill="#fb7185" fill-opacity="0.75"/>
+        <!-- おめめ -->
+        <circle cx="28" cy="41" r="3.4" fill="#0f172a"/>
+        <circle cx="26.9" cy="39.8" r="1.2" fill="#ffffff"/>
+        <circle cx="44" cy="41" r="3.4" fill="#0f172a"/>
+        <circle cx="42.9" cy="39.8" r="1.2" fill="#ffffff"/>
+        <!-- にゃんこ風お口 -->
+        <path d="M32.5 46.5C34 48.2 35.5 48.2 36 46.5C36.5 48.2 38 48.2 39.5 46.5" stroke="#0f172a" stroke-width="2.2" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="bunnyGrad" x1="16" y1="26" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="55%" stop-color="#f5d0fe"/>
+            <stop offset="100%" stop-color="#a5f3fc"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </span>
+  </button>
 
   <div id="noticeBox" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2.5 rounded-2xl bg-slate-900/95 border border-cyan-400/50 text-xs font-bold text-cyan-100 shadow-2xl text-center max-w-sm"></div>
 
@@ -435,7 +455,7 @@
     (function () {
       const canvas = document.getElementById('neonGridCanvas');
       const ctx = canvas.getContext('2d');
-      const mascot = document.getElementById('pyokoMascot');
+      const animalBtn = document.getElementById('animalBtn');
 
       const PALETTES = [
         {
@@ -518,21 +538,4 @@
           const horizontal = Math.random() < 0.55;
           const color = pal.streaks[Math.floor(Math.random() * pal.streaks.length)];
           if (horizontal) {
-            const row = Math.floor(Math.random() * Math.max(1, height / GRID_SIZE)) * GRID_SIZE;
-            const dir = Math.random() < 0.5 ? 1 : -1;
-            lightStreaks.push({
-              horizontal: true,
-              x: dir === 1 ? -120 : width + 120,
-              y: row,
-              vx: dir * (3.6 + Math.random() * 4.8),
-              vy: 0,
-              length: 75 + Math.random() * 115,
-              color
-            });
-          } else {
-            const col = Math.floor(Math.random() * Math.max(1, width / GRID_SIZE)) * GRID_SIZE;
-            const dir = Math.random() < 0.5 ? 1 : -1;
-            lightStreaks.push({
-              horizontal: false,
-              x: col,
-              y: dir === 1 ? -120 : height + 
+            const row = Math.floor(Math.random() * Math.m
