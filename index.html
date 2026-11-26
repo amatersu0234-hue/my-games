@@ -4,17 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>マイゲーム作品集</title>
-  <!-- Tailwind CSS（レスポンシブ＆カードレイアウト調整用） -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- レトロゲーム風ドットフォント＆読みやすい日本語フォント -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Inter:wght@400;600;800&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet" />
 
   <style>
-    /* =========================================================================
-       カラー＆ネオンテーマ設定
-       ========================================================================= */
     :root {
       --bg-deep: #060714;
       --neon-cyan: #22d3ee;
@@ -37,13 +32,11 @@
       overflow-x: hidden;
     }
 
-    /* レトロアーケード風ドット見出しフォント */
     .font-pixel {
       font-family: 'DotGothic16', monospace;
       letter-spacing: 0.06em;
     }
 
-    /* 背景アニメーション用フルスクリーンCanvas */
     #neonGridCanvas {
       position: fixed;
       inset: 0;
@@ -53,7 +46,6 @@
       pointer-events: none;
     }
 
-    /* うっすら走るレトロモニター風の走査線（スキャンライン） */
     .crt-scanlines {
       position: fixed;
       inset: 0;
@@ -67,7 +59,6 @@
       );
     }
 
-    /* ネオン枠付きグラスモーフィズムカード */
     .game-card {
       background: rgba(13, 16, 38, 0.75);
       backdrop-filter: blur(14px);
@@ -88,7 +79,6 @@
         inset 0 0 24px rgba(232, 121, 249, 0.18);
     }
 
-    /* ホラーゲーム（深海・怪異の釣堀）カード用の深紅アクセント */
     .game-card-horror {
       border-color: rgba(244, 63, 94, 0.35);
       box-shadow:
@@ -103,7 +93,6 @@
         inset 0 0 24px rgba(225, 29, 72, 0.22);
     }
 
-    /* 新作ピックアップ（宝石発掘ゲーム）用のゴールド＆プリズムアクセント */
     .game-card-featured {
       border: 1.5px solid rgba(251, 191, 36, 0.55);
       box-shadow:
@@ -112,7 +101,14 @@
         inset 0 0 26px rgba(251, 191, 36, 0.14);
     }
 
-    /* 通常プレイボタン（シアン〜バイオレットネオン） */
+    .game-card-new5 {
+      border: 1.5px solid rgba(34, 211, 238, 0.65);
+      box-shadow:
+        0 14px 38px rgba(0, 0, 0, 0.65),
+        0 0 24px rgba(34, 211, 238, 0.26),
+        inset 0 0 24px rgba(34, 211, 238, 0.14);
+    }
+
     .play-btn {
       background: linear-gradient(135deg, #06b6d4 0%, #6366f1 55%, #c026d3 100%);
       box-shadow: 0 4px 16px rgba(34, 211, 238, 0.3);
@@ -126,7 +122,6 @@
       transform: scale(0.97);
     }
 
-    /* ホラー専用プレイボタン（深紅クリムゾンネオン） */
     .horror-btn {
       background: linear-gradient(135deg, #9f1239 0%, #e11d48 55%, #4c0519 100%);
       border: 1px solid rgba(253, 164, 175, 0.4);
@@ -141,7 +136,6 @@
       transform: scale(0.97);
     }
 
-    /* 新作ピックアップ専用プレイボタン（プリズムゴールド） */
     .featured-btn {
       background: linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%);
       box-shadow: 0 4px 18px rgba(251, 191, 36, 0.35);
@@ -155,7 +149,19 @@
       transform: scale(0.97);
     }
 
-    /* ネオン発光タイトル文字 */
+    .new5-btn {
+      background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 55%, #e879f9 100%);
+      box-shadow: 0 4px 18px rgba(34, 211, 238, 0.38);
+      transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+    }
+    .new5-btn:hover {
+      filter: brightness(1.12);
+      box-shadow: 0 6px 24px rgba(232, 121, 249, 0.5);
+    }
+    .new5-btn:active {
+      transform: scale(0.97);
+    }
+
     .text-neon-glow {
       text-shadow:
         0 0 10px rgba(34, 211, 238, 0.7),
@@ -169,18 +175,83 @@
     .beacon-dot {
       animation: pulseBeacon 1.8s ease-in-out infinite;
     }
+
+    /* ぴょこぴょこマスコットアニメーション */
+    @keyframes pyokoBounce {
+      0%, 100% {
+        transform: translateY(0px) scaleX(1.06) scaleY(0.92);
+      }
+      22% {
+        transform: translateY(-18px) scaleX(0.94) scaleY(1.08) rotate(-4deg);
+      }
+      45% {
+        transform: translateY(0px) scaleX(1.08) scaleY(0.90);
+      }
+      65% {
+        transform: translateY(-10px) scaleX(0.97) scaleY(1.04) rotate(4deg);
+      }
+      82% {
+        transform: translateY(0px) scaleX(1.04) scaleY(0.95);
+      }
+    }
+
+    @keyframes pyokoExcited {
+      0% { transform: translateY(0) scale(1); }
+      25% { transform: translateY(-28px) scale(1.12, 0.88) rotate(-10deg); }
+      50% { transform: translateY(-8px) scale(0.92, 1.12) rotate(10deg); }
+      75% { transform: translateY(-22px) scale(1.08, 0.92) rotate(-6deg); }
+      100% { transform: translateY(0) scale(1) rotate(0deg); }
+    }
+
+    .pyoko-mascot {
+      position: fixed;
+      bottom: 18px;
+      left: 20px;
+      z-index: 40;
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
+      animation: pyokoBounce 1.7s ease-in-out infinite;
+      transition: left 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), bottom 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+      filter: drop-shadow(0 8px 16px rgba(34, 211, 238, 0.35));
+    }
+
+    .pyoko-mascot.is-excited {
+      animation: pyokoExcited 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* タップ時ポップエフェクト */
+    @keyframes tapPopBurst {
+      0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+      }
+      70% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1.25) rotate(var(--rot));
+      }
+    }
+
+    .tap-pop-item {
+      position: fixed;
+      pointer-events: none;
+      z-index: 45;
+      font-weight: 900;
+      animation: tapPopBurst 0.68s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.65);
+    }
   </style>
 </head>
 <body class="relative flex flex-col min-h-dvh selection:bg-fuchsia-500 selection:text-white">
 
-  <!-- ==================== 背景レイヤー（Canvas ＋ 走査線） ==================== -->
   <canvas id="neonGridCanvas" aria-hidden="true"></canvas>
   <div class="crt-scanlines" aria-hidden="true"></div>
 
-  <!-- ==================== メインコンテンツ ==================== -->
   <div class="relative z-10 flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-10 sm:py-14 flex flex-col justify-between gap-10">
 
-    <!-- 1. ヘッダー（既存タイトル・サブタイトルを引き継ぎつつネオン化） -->
     <header class="text-center space-y-4 pt-2 sm:pt-4">
       <div class="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-cyan-950/75 border border-cyan-400/40 shadow-[0_0_15px_rgba(34,211,238,0.25)]">
         <span class="w-2.5 h-2.5 bg-cyan-400 beacon-dot inline-block"></span>
@@ -195,7 +266,6 @@
         ブラウザですぐに遊べます
       </p>
 
-      <!-- 背景アニメーション操作ボタン -->
       <div class="flex flex-wrap items-center justify-center gap-2.5 pt-2">
         <button id="btnBoostPulse" type="button" class="px-4 py-2 rounded-2xl bg-white/10 hover:bg-cyan-500/25 border border-cyan-300/35 text-xs font-bold text-cyan-200 transition active:scale-95">
           ⚡ ネオンパルス
@@ -206,16 +276,15 @@
       </div>
     </header>
 
-    <!-- 2. ゲームカード一覧（既存の3作品すべて維持 ＋ 新作4作目カード） -->
     <main class="space-y-5">
       <div class="flex items-center justify-between border-b border-cyan-400/25 pb-2.5">
         <span class="font-pixel text-sm sm:text-base text-cyan-200">SELECT STAGE</span>
-        <span class="font-pixel text-xs text-slate-400">4 GAMES READY</span>
+        <span class="font-pixel text-xs text-slate-400">5 GAMES READY</span>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-        <!-- ゲーム1（既存タイトル・説明・URLそのまま） -->
+        <!-- ゲーム1 -->
         <article class="game-card rounded-3xl p-5 sm:p-6 flex flex-col justify-between gap-5">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
@@ -236,7 +305,7 @@
           </a>
         </article>
 
-        <!-- ゲーム2（既存タイトル・説明・URLそのまま） -->
+        <!-- ゲーム2 -->
         <article class="game-card rounded-3xl p-5 sm:p-6 flex flex-col justify-between gap-5">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
@@ -257,7 +326,7 @@
           </a>
         </article>
 
-        <!-- ゲーム3（既存タイトル・説明・URLそのまま ＋ 深紅ホラーアクセント） -->
+        <!-- ゲーム3 -->
         <article class="game-card game-card-horror rounded-3xl p-5 sm:p-6 flex flex-col justify-between gap-5">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
@@ -278,13 +347,12 @@
           </a>
         </article>
 
-        <!-- ゲーム4（今回作成した宝石＆秘宝発掘コレクション） -->
-        <!-- ★アップロード先のフォルダ名やファイル名に合わせて href="./game4/" を変更してください -->
+        <!-- ゲーム4 -->
         <article class="game-card game-card-featured rounded-3xl p-5 sm:p-6 flex flex-col justify-between gap-5">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <span class="px-3 py-1 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-400/30 to-fuchsia-500/30 border border-amber-300/55 text-amber-200">
-                ★ NEW / STAGE 04
+                STAGE 04 / DIG &amp; 3D
               </span>
               <span class="text-2xl" aria-hidden="true">💎</span>
             </div>
@@ -295,8 +363,28 @@
               光の結晶ラインを刻んで謎の原石塊を掘り出し、3段階研磨で全250種の宝石やドクロ秘宝を集める発掘ゲーム！魔術師の骨董展示室・呪いと浄化の儀式・BGM付き。
             </p>
           </div>
-          <!-- ★ゲーム4のリンク先（例: ./game4/ や ./gem-digger.html などお好みで変更OK） -->
           <a href="./game4/" class="play-btn featured-btn w-full py-3 px-4 rounded-2xl text-center text-sm font-black text-white tracking-wide block">
+            ▶ あそぶ
+          </a>
+        </article>
+
+        <!-- ゲーム5（追加枠：URLは ./game5/） -->
+        <article class="game-card game-card-new5 rounded-3xl p-5 sm:p-6 flex flex-col justify-between gap-5 md:col-span-2">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="px-3 py-1 rounded-full text-[11px] font-black bg-cyan-400/25 border border-cyan-300/55 text-cyan-200">
+                ★ NEW / STAGE 05
+              </span>
+              <span class="text-2xl" aria-hidden="true">✨</span>
+            </div>
+            <h2 class="text-lg sm:text-xl font-black text-white leading-snug">
+              ネオンナイト＊アニマルパーティー
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              ぷにぷにした可愛いネオン調アニマルの3マッチパズルゲーム<code class="text-cyan-300">./game5/</code> に設定済みです。
+            </p>
+          </div>
+          <a href="./game5/" class="play-btn new5-btn w-full py-3 px-4 rounded-2xl text-center text-sm font-black text-white tracking-wide block">
             ▶ あそぶ
           </a>
         </article>
@@ -304,7 +392,6 @@
       </div>
     </main>
 
-    <!-- 3. フッター -->
     <footer class="text-center space-y-2 pt-4 border-t border-white/10 text-xs text-slate-400">
       <p class="font-pixel text-[11px] text-slate-500">
         RETRO PIXEL &amp; NEON GRID — MY GAME COLLECTION
@@ -312,25 +399,49 @@
     </footer>
   </div>
 
-  <!-- トースト通知ボックス -->
+  <!-- ぴょこぴょこ動くマスコットキャラ -->
+  <div id="pyokoMascot" class="pyoko-mascot" title="タップしてね！" aria-label="ぴょこぴょこマスコット">
+    <svg width="68" height="68" viewBox="0 0 68 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- お耳・ツノ風アクセント -->
+      <path d="M18 22L13 8L27 17" fill="#e879f9" stroke="#22d3ee" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="M50 22L55 8L41 17" fill="#22d3ee" stroke="#e879f9" stroke-width="2.2" stroke-linejoin="round"/>
+      <!-- ぷにぷにボディ -->
+      <path d="M12 46C12 27 21 18 34 18C47 18 56 27 56 46C56 54 47 58 34 58C21 58 12 54 12 46Z" fill="url(#mascotGrad)" stroke="#ffffff" stroke-opacity="0.7" stroke-width="2"/>
+      <!-- ツヤハイライト -->
+      <ellipse cx="24" cy="28" rx="6" ry="3.5" transform="rotate(-22 24 28)" fill="#ffffff" fill-opacity="0.65"/>
+      <!-- ほっぺ -->
+      <ellipse cx="21" cy="43" rx="4" ry="2.4" fill="#fb7185" fill-opacity="0.7"/>
+      <ellipse cx="47" cy="43" rx="4" ry="2.4" fill="#fb7185" fill-opacity="0.7"/>
+      <!-- おめめ -->
+      <circle cx="26" cy="38" r="3.4" fill="#060714"/>
+      <circle cx="25" cy="36.8" r="1.2" fill="#ffffff"/>
+      <circle cx="42" cy="38" r="3.4" fill="#060714"/>
+      <circle cx="41" cy="36.8" r="1.2" fill="#ffffff"/>
+      <!-- にっこりお口 -->
+      <path d="M30 43.5C31.5 46 36.5 46 38 43.5" stroke="#060714" stroke-width="2.3" stroke-linecap="round"/>
+      <defs>
+        <linearGradient id="mascotGrad" x1="14" y1="18" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#22d3ee"/>
+          <stop offset="55%" stop-color="#a855f7"/>
+          <stop offset="100%" stop-color="#ec4899"/>
+        </linearGradient>
+      </defs>
+    </svg>
+  </div>
+
   <div id="noticeBox" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2.5 rounded-2xl bg-slate-900/95 border border-cyan-400/50 text-xs font-bold text-cyan-100 shadow-2xl text-center max-w-sm"></div>
 
   <script>
-    /**
-     * =========================================================================
-     * レトロピクセル／グリッド ＋ ネオン光彩 アニメーションエンジン
-     * =========================================================================
-     */
     (function () {
       const canvas = document.getElementById('neonGridCanvas');
       const ctx = canvas.getContext('2d');
+      const mascot = document.getElementById('pyokoMascot');
 
       const PALETTES = [
         {
           name: 'サイバーシアン＆マゼンタ',
           grid: 'rgba(34, 211, 238, 0.16)',
           gridMajor: 'rgba(232, 121, 249, 0.25)',
-          horizonGlow: 'rgba(232, 121, 249, 0.22)',
           aurora1: 'rgba(34, 211, 238, 0.17)',
           aurora2: 'rgba(232, 121, 249, 0.16)',
           aurora3: 'rgba(139, 92, 246, 0.18)',
@@ -340,7 +451,6 @@
           name: '魔術師バイオレット＆ゴールド',
           grid: 'rgba(168, 85, 247, 0.18)',
           gridMajor: 'rgba(251, 191, 36, 0.24)',
-          horizonGlow: 'rgba(251, 191, 36, 0.20)',
           aurora1: 'rgba(139, 92, 246, 0.20)',
           aurora2: 'rgba(251, 191, 36, 0.14)',
           aurora3: 'rgba(236, 72, 153, 0.15)',
@@ -350,7 +460,6 @@
           name: '深海エメラルド＆クリムゾン',
           grid: 'rgba(52, 211, 153, 0.16)',
           gridMajor: 'rgba(56, 189, 248, 0.24)',
-          horizonGlow: 'rgba(52, 211, 153, 0.20)',
           aurora1: 'rgba(16, 185, 129, 0.17)',
           aurora2: 'rgba(59, 130, 246, 0.18)',
           aurora3: 'rgba(244, 63, 94, 0.13)',
@@ -363,7 +472,6 @@
       let height = 0;
       const GRID_SIZE = 48;
 
-      const pointer = { x: -9999, y: -9999, active: false };
       const pixelStars = [];
       const lightStreaks = [];
       const cursorParticles = [];
@@ -410,7 +518,7 @@
           const horizontal = Math.random() < 0.55;
           const color = pal.streaks[Math.floor(Math.random() * pal.streaks.length)];
           if (horizontal) {
-            const row = Math.floor(Math.random() * (height / GRID_SIZE)) * GRID_SIZE;
+            const row = Math.floor(Math.random() * Math.max(1, height / GRID_SIZE)) * GRID_SIZE;
             const dir = Math.random() < 0.5 ? 1 : -1;
             lightStreaks.push({
               horizontal: true,
@@ -422,125 +530,9 @@
               color
             });
           } else {
-            const col = Math.floor(Math.random() * (width / GRID_SIZE)) * GRID_SIZE;
+            const col = Math.floor(Math.random() * Math.max(1, width / GRID_SIZE)) * GRID_SIZE;
             const dir = Math.random() < 0.5 ? 1 : -1;
             lightStreaks.push({
               horizontal: false,
               x: col,
-              y: dir === 1 ? -120 : height + 120,
-              vx: 0,
-              vy: dir * (3.6 + Math.random() * 4.8),
-              length: 75 + Math.random() * 115,
-              color
-            });
-          }
-        }
-      }
-
-      function spawnCursorDust(x, y, count = 3) {
-        const pal = PALETTES[paletteIdx];
-        for (let i = 0; i < count; i++) {
-          const angle = Math.random() * Math.PI * 2;
-          const spd = 0.6 + Math.random() * 2.4;
-          cursorParticles.push({
-            x,
-            y,
-            vx: Math.cos(angle) * spd,
-            vy: Math.sin(angle) * spd - 0.4,
-            size: Math.random() < 0.35 ? 4 : 2,
-            color: pal.streaks[Math.floor(Math.random() * pal.streaks.length)],
-            alpha: 1
-          });
-        }
-      }
-
-      function spawnTapRipple(x, y) {
-        const pal = PALETTES[paletteIdx];
-        tapRipples.push({
-          x,
-          y,
-          radius: 8,
-          maxRadius: 150,
-          alpha: 0.75,
-          color: pal.streaks[Math.floor(Math.random() * pal.streaks.length)]
-        });
-      }
-
-      window.addEventListener('pointermove', (e) => {
-        pointer.x = e.clientX;
-        pointer.y = e.clientY;
-        pointer.active = true;
-        if (Math.random() < 0.55) {
-          spawnCursorDust(pointer.x, pointer.y, 2);
-        }
-      });
-
-      window.addEventListener('pointerdown', (e) => {
-        pointer.x = e.clientX;
-        pointer.y = e.clientY;
-        pointer.active = true;
-        spawnCursorDust(pointer.x, pointer.y, 12);
-        spawnTapRipple(pointer.x, pointer.y);
-        spawnLightStreak(2);
-      });
-
-      document.getElementById('btnBoostPulse')?.addEventListener('click', () => {
-        spawnLightStreak(7);
-        spawnTapRipple(width * 0.5, height * 0.35);
-        showNotice('⚡ ネオンパルスを放ちました！');
-      });
-
-      document.getElementById('btnPaletteShift')?.addEventListener('click', () => {
-        paletteIdx = (paletteIdx + 1) % PALETTES.length;
-        initPixelStars();
-        spawnLightStreak(5);
-        showNotice(`🎨 カラーテーマ: ${PALETTES[paletteIdx].name}`);
-      });
-
-      function animate(now) {
-        const t = now * 0.001;
-        const pal = PALETTES[paletteIdx];
-
-        // 1. 深いミッドナイト背景ベース
-        ctx.fillStyle = '#060714';
-        ctx.fillRect(0, 0, width, height);
-
-        // 2. ゆらめくネオン光彩オーラ
-        const a1x = width * 0.2 + Math.sin(t * 0.45) * 75;
-        const a1y = height * 0.24 + Math.cos(t * 0.35) * 55;
-        const g1 = ctx.createRadialGradient(a1x, a1y, 10, a1x, a1y, Math.max(width, height) * 0.5);
-        g1.addColorStop(0, pal.aurora1);
-        g1.addColorStop(1, 'transparent');
-        ctx.fillStyle = g1;
-        ctx.fillRect(0, 0, width, height);
-
-        const a2x = width * 0.8 + Math.cos(t * 0.4) * 80;
-        const a2y = height * 0.62 + Math.sin(t * 0.5) * 60;
-        const g2 = ctx.createRadialGradient(a2x, a2y, 10, a2x, a2y, Math.max(width, height) * 0.5);
-        g2.addColorStop(0, pal.aurora2);
-        g2.addColorStop(1, 'transparent');
-        ctx.fillStyle = g2;
-        ctx.fillRect(0, 0, width, height);
-
-        const a3x = width * 0.5 + Math.sin(t * 0.32) * 65;
-        const a3y = height * 0.88;
-        const g3 = ctx.createRadialGradient(a3x, a3y, 10, a3x, a3y, Math.max(width, height) * 0.45);
-        g3.addColorStop(0, pal.aurora3);
-        g3.addColorStop(1, 'transparent');
-        ctx.fillStyle = g3;
-        ctx.fillRect(0, 0, width, height);
-
-        // 3. レトロピクセル・グリッド線（平面グリッド）
-        const pulseAlpha = 0.85 + Math.sin(t * 1.8) * 0.15;
-        ctx.save();
-        ctx.globalAlpha = pulseAlpha;
-
-        for (let x = 0; x <= width; x += GRID_SIZE) {
-          const isMajor = (x / GRID_SIZE) % 4 === 0;
-          ctx.strokeStyle = isMajor ? pal.gridMajor : pal.grid;
-          ctx.lineWidth = isMajor ? 1.2 : 1;
-          ctx.beginPath();
-          ctx.moveTo(x + 0.5, 0);
-          ctx.lineTo(x + 0.5, height);
-          ctx.stroke();
-  
+              y: dir === 1 ? -120 : height + 
